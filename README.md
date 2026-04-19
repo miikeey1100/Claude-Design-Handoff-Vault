@@ -111,11 +111,20 @@ npx handoff-cdn use aerodrop | claude
 npx handoff-cdn use luxar-vault > brief.txt
 # paste brief.txt into your AI of choice
 
-# Inspect bundle metadata
-npx handoff-cdn info visionsynth
+# Open bundle in local browser (no AI needed)
+npx handoff-cdn preview tradepulse
 
-# Install as a permanent project skill
+# Extract just the CSS token block
+npx handoff-cdn tokens agentic-ops >> tokens.css
+
+# Add token rules to Cursor
+npx handoff-cdn cursorrules aerodrop >> .cursorrules
+
+# Install as a permanent Claude skill
 npx handoff-cdn skill install
+
+# Scaffold a new bundle interactively
+npx handoff-cdn new
 ```
 
 Works with **Claude Code, Cursor, ChatGPT, Gemini, Copilot** — any tool that accepts text input.
@@ -156,25 +165,29 @@ You are implementing a Handoff-CDN bundle. Rules:
 
 ---
 
-## Bundle Registry
+## Bundle Registry — 12 Bundles
 
-### Flagship — 4 Elite Bundles
+### ✦ Liquid Glass
 
-| Preview | Bundle | Design Family | Command |
-|---|---|---|---|
-| ![AeroDrop](previews/comparisons/aerodrop.png) | **AeroDrop**<br><sub>Autonomous AI delivery network · iOS frame · 3D map · glass agent cards</sub> | Liquid Glass | `npx handoff-cdn use aerodrop` |
-| ![Agentic Ops](previews/comparisons/agentic-ops.png) | **Agentic Ops**<br><sub>AI swarm orchestration console · live agent grid · terminal log</sub> | Monochrome | `npx handoff-cdn use agentic-ops` |
-| ![Luxar Vault](previews/comparisons/luxar-vault.png) | **Luxar Vault**<br><sub>AI-native crypto wallet · smart swap interface · glass panels</sub> | Liquid Glass | `npx handoff-cdn use luxar-vault` |
-| ![VisionSynth](previews/comparisons/visionsynth.png) | **VisionSynth**<br><sub>AI video generation studio · timeline · glass cards · model selector</sub> | Liquid Glass | `npx handoff-cdn use visionsynth` |
-
-### Extended Library — 4 More Bundles
-
-| Bundle | Design Family | Command |
+| Preview | Bundle | Command |
 |---|---|---|
-| **BioPulse** — AI health & vitals tracker | Liquid Glass | `npx handoff-cdn use biopulse` |
-| **NeuralStore** — AI-specialist e-commerce | Monochrome | `npx handoff-cdn use neuralstore` |
-| **Orchestrator** — Logic chain workflow builder | Monochrome | `npx handoff-cdn use orchestrator` |
-| **Frontier** — AI-native IDE interface | Monochrome | `npx handoff-cdn use frontier` |
+| ![AeroDrop](previews/comparisons/aerodrop.png) | **AeroDrop**<br><sub>Autonomous AI delivery · iOS frame · 3D isometric map · glass agent cards</sub> | `npx handoff-cdn use aerodrop` |
+| ![Luxar Vault](previews/comparisons/luxar-vault.png) | **Luxar Vault**<br><sub>AI crypto wallet · iridescent holographic glass · smart swap · risk slider</sub> | `npx handoff-cdn use luxar-vault` |
+| ![VisionSynth](previews/comparisons/visionsynth.png) | **VisionSynth**<br><sub>AI video studio · bento grid · glass timeline · style preset cards</sub> | `npx handoff-cdn use visionsynth` |
+| ![SpectraChat](previews/comparisons/spectra-chat.png) | **SpectraChat**<br><sub>AI-native chat · glass message bubbles · code blocks · streaming indicator</sub> | `npx handoff-cdn use spectra-chat` |
+| ![CrystalPay](previews/comparisons/crystalpay.png) | **CrystalPay**<br><sub>AI payment dashboard · balance card · Atlas AI insights · spending chart</sub> | `npx handoff-cdn use crystalpay` |
+| ![BioPulse](previews/biopulse.png) | **BioPulse**<br><sub>AI health tracker · biometric rings · vitals panels · activity timeline</sub> | `npx handoff-cdn use biopulse` |
+
+### ◆ Monochrome
+
+| Preview | Bundle | Command |
+|---|---|---|
+| ![Agentic Ops](previews/comparisons/agentic-ops.png) | **Agentic Ops**<br><sub>AI swarm console · 3D force graph · radial knobs · terminal log</sub> | `npx handoff-cdn use agentic-ops` |
+| ![TradePulse](previews/comparisons/tradepulse.png) | **TradePulse**<br><sub>Trading terminal · SVG candlestick chart · order book depth · positions</sub> | `npx handoff-cdn use tradepulse` |
+| ![ShipTrack](previews/comparisons/shiptrack.png) | **ShipTrack**<br><sub>Logistics ops center · shipments table · carrier performance · exceptions</sub> | `npx handoff-cdn use shiptrack` |
+| ![NeuralStore](previews/comparisons/neuralstore.png) | **NeuralStore**<br><sub>AI e-commerce · Swiss editorial grid · "Engineered for signal."</sub> | `npx handoff-cdn use neuralstore` |
+| ![Orchestrator](previews/orchestrator.png) | **Orchestrator**<br><sub>AI workflow builder · pipeline graph · agent node editor · execution log</sub> | `npx handoff-cdn use orchestrator` |
+| ![Frontier](previews/frontier.png) | **Frontier**<br><sub>AI-native IDE landing page · editor mockup · feature grid · terminal footer</sub> | `npx handoff-cdn use frontier` |
 
 ---
 
@@ -182,13 +195,13 @@ You are implementing a Handoff-CDN bundle. Rules:
 
 Every bundle belongs to exactly one of two token families. The AI enforces this automatically.
 
-### Liquid Glass
+### ✦ Liquid Glass
 Frosted surfaces. oklch depth. Backdrop blur. 10–32px radii.  
-**Used by:** AeroDrop · Luxar Vault · VisionSynth · BioPulse
+**Used by:** AeroDrop · Luxar Vault · VisionSynth · SpectraChat · CrystalPay · BioPulse
 
-### Monochrome
+### ◆ Monochrome
 Silver-ink ladder. 4px baseline. Hairline grids. One accent — `#00b872` — never decorative.  
-**Used by:** Agentic Ops · Orchestrator · NeuralStore · Frontier
+**Used by:** Agentic Ops · TradePulse · ShipTrack · NeuralStore · Orchestrator · Frontier
 
 Mixing families in one project is explicitly banned. The token contract enforces it.
 

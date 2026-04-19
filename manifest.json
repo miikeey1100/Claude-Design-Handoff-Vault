@@ -111,6 +111,58 @@
       "chat": "chats/chat1.md",
       "preview": "previews/visionsynth.png",
       "comparison": "previews/comparisons/visionsynth.png"
+    },
+    {
+      "slug": "spectra-chat",
+      "title": "SpectraChat — AI-Native Chat Interface",
+      "description": "Production-grade AI chat UI with dark Liquid Glass aesthetic. Conversation sidebar with glass panels, main chat thread with glass message bubbles (assistant left, user right), inline code blocks with oklch syntax highlighting, streaming badge, animated typing indicator, and model selector showing Claude Opus 4. Space Grotesk + JetBrains Mono.",
+      "family": "Liquid Glass",
+      "fidelity": 97,
+      "tags": ["chat", "ai", "messaging", "desktop", "liquid-glass", "claude"],
+      "dir": "bundles/spectra-chat",
+      "primary": "project/SpectraChat.html",
+      "chat": "chats/chat1.md",
+      "preview": "previews/spectra-chat.png",
+      "comparison": "previews/comparisons/spectra-chat.png"
+    },
+    {
+      "slug": "crystalpay",
+      "title": "CrystalPay — AI Payment Dashboard",
+      "description": "Ultra-premium AI-powered payment dashboard with Liquid Glass aesthetic. Hero balance card with shimmer overlay showing $24,891.50, quick action glass pills, Atlas AI insight panel detecting $89/mo recurring savings, 7-row transaction history, CSS-only spending bar chart, and category breakdown with glass progress bars. Warm wash background.",
+      "family": "Liquid Glass",
+      "fidelity": 96,
+      "tags": ["finance", "payments", "dashboard", "desktop", "liquid-glass", "ai"],
+      "dir": "bundles/crystalpay",
+      "primary": "project/CrystalPay.html",
+      "chat": "chats/chat1.md",
+      "preview": "previews/crystalpay.png",
+      "comparison": "previews/comparisons/crystalpay.png"
+    },
+    {
+      "slug": "tradepulse",
+      "title": "TradePulse — Trading Terminal",
+      "description": "Professional crypto/stock trading terminal. Monochrome dark: 8-ticker watchlist (BTC/ETH/SOL/AAPL/NVDA/MSFT/SPY/QQQ), 48-candle SVG candlestick chart with gridlines and price crosshair, 8+8 order book with depth-bar visualization, 4 open positions with P&L. Bloomberg meets Dieter Rams. JetBrains Mono throughout, Chakra Petch headers.",
+      "family": "Monochrome",
+      "fidelity": 97,
+      "tags": ["trading", "terminal", "finance", "desktop", "monochrome", "chart"],
+      "dir": "bundles/tradepulse",
+      "primary": "project/TradePulse.html",
+      "chat": "chats/chat1.md",
+      "preview": "previews/tradepulse.png",
+      "comparison": "previews/comparisons/tradepulse.png"
+    },
+    {
+      "slug": "shiptrack",
+      "title": "ShipTrack — Logistics Operations Center",
+      "description": "Shipment tracking operations dashboard. Monochrome: header with 247 active routes live indicator, sidebar with nav and key metrics (94.2% on-time), 4 stat cards, 8-row shipments table with tracking IDs/routes/carriers/status badges, CSS bar chart for carrier performance, and route exceptions list. One green accent for live status only.",
+      "family": "Monochrome",
+      "fidelity": 95,
+      "tags": ["logistics", "dashboard", "operations", "desktop", "monochrome", "table"],
+      "dir": "bundles/shiptrack",
+      "primary": "project/ShipTrack.html",
+      "chat": "chats/chat1.md",
+      "preview": "previews/shiptrack.png",
+      "comparison": "previews/comparisons/shiptrack.png"
     }
   ]
 }
