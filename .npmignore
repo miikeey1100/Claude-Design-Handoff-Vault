@@ -1,0 +1,13 @@
+# Exclude everything that the CLI fetches from CDN at runtime
+bundles/
+previews/
+examples/
+marketing/
+scripts/
+demo.html
+PLAN.md
+node_modules/
+package-lock.json
+*.tgz
+
+# Keep: bin/, manifest.json, package.json, README.md, LICENSE, CLAUDE.md, SKILL.md, CONTRIBUTING.md

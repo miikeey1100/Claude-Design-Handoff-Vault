@@ -4,8 +4,8 @@
   "description": "Handoff-CDN — The Design-to-Code Protocol for Claude. Stream high-fidelity UI bundles into Claude Code instantly.",
   "type": "module",
   "bin": {
-    "handoff-cdn": "./bin/handoff-cdn.js",
-    "clawkit": "./bin/clawkit"
+    "handoff-cdn": "bin/handoff-cdn.js",
+    "clawkit": "bin/clawkit"
   },
   "scripts": {
     "capture": "node scripts/capture.mjs",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/miikeey1100/Claude-Design-Handoff-Vault.git"
+    "url": "git+https://github.com/miikeey1100/Claude-Design-Handoff-Vault.git"
   },
   "devDependencies": {
     "omggif": "^1.0.10",
