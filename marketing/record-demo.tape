@@ -1,4 +1,4 @@
-# VHS tape — record the ClawBridge demo GIF
+# VHS tape — record the Handoff-CDN demo GIF
 # Install VHS: brew install vhs   OR   go install github.com/charmbracelet/vhs@latest
 # Run: vhs marketing/record-demo.tape
 # Output: marketing/demo.gif  (drop into README at the GIF placeholder)
@@ -18,20 +18,20 @@ Set PlaybackSpeed 0.8
 # Opening pause
 Sleep 1s
 
-# Show what ClawBridge does
-Type "# ClawBridge — stream a design bundle into Claude Code"
+# Show what Handoff-CDN does
+Type "# Handoff-CDN — stream a design bundle into Claude Code"
 Sleep 500ms
 Enter
 Sleep 300ms
 
 # List available bundles
-Type "npx clawbridge list"
+Type "npx handoff-cdn list"
 Sleep 500ms
 Enter
 Sleep 2s
 
 # Use a bundle
-Type "npx clawbridge use aerodrop | claude"
+Type "npx handoff-cdn use aerodrop | claude"
 Sleep 500ms
 Enter
 Sleep 4s

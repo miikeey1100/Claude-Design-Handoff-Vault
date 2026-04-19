@@ -28,7 +28,7 @@ const TOKENS = {
   Rule: radius ≤ 6px. No gradients except hairline dividers.`,
 };
 
-const SKILL_BLOCK = `\n<!-- ClawBridge Skill v${VERSION} -->\n# ClawBridge Design Protocol\n\nWhen implementing any UI from a ClawBridge bundle:\n- Maintain pixel-perfect fidelity — no simplification or "improvements"\n- Preserve all oklch() color values — do not convert to hex\n- Enforce family token rules: Liquid Glass (8px baseline, blur required) or Monochrome (4px baseline, radius ≤ 6px)\n- Never mix design families within a component\n- Full contract: https://github.com/miikeey1100/Claude-Design-Handoff-Vault/blob/main/CLAUDE.md\n<!-- /ClawBridge Skill -->\n`;
+const SKILL_BLOCK = `\n<!-- Handoff-CDN Skill v${VERSION} -->\n# Handoff-CDN Design Protocol\n\nWhen implementing any UI from a Handoff-CDN bundle:\n- Maintain pixel-perfect fidelity — no simplification or "improvements"\n- Preserve all oklch() color values — do not convert to hex\n- Enforce family token rules: Liquid Glass (8px baseline, blur required) or Monochrome (4px baseline, radius ≤ 6px)\n- Never mix design families within a component\n- Full contract: https://github.com/miikeey1100/Claude-Design-Handoff-Vault/blob/main/CLAUDE.md\n<!-- /Handoff-CDN Skill -->\n`;
 
 function get(url) {
   return new Promise((resolve, reject) => {
@@ -61,25 +61,25 @@ async function loadManifest() {
 
 function banner(b) {
   const line = '═'.repeat(52);
-  return `${line}\n  ClawBridge Protocol · ${b.slug} · v${VERSION}\n  ${b.title}\n  Family: ${b.family}  ·  Fidelity: ${b.fidelity}%  ·  CDN: GitHub Raw\n${line}\n`;
+  return `${line}\n  Handoff-CDN Protocol · ${b.slug} · v${VERSION}\n  ${b.title}\n  Family: ${b.family}  ·  Fidelity: ${b.fidelity}%  ·  CDN: GitHub Raw\n${line}\n`;
 }
 
 const [,, cmd, arg] = argv;
 
 if (!cmd || cmd === '--help' || cmd === '-h') {
   stdout.write(`
-ClawBridge — The Design-to-Code Protocol for Claude  v${VERSION}
+Handoff-CDN — The Design-to-Code Protocol for Claude  v${VERSION}
 
-  npx clawbridge use <slug>        Stream bundle into Claude Code
-  npx clawbridge list              Show all registered bundles
-  npx clawbridge info <slug>       Bundle metadata + preview URL
-  npx clawbridge manifest          Print CDN registry JSON
-  npx clawbridge skill install     Install ClawBridge as a Claude Skill
+  npx handoff-cdn use <slug>        Stream bundle into Claude Code
+  npx handoff-cdn list              Show all registered bundles
+  npx handoff-cdn info <slug>       Bundle metadata + preview URL
+  npx handoff-cdn manifest          Print CDN registry JSON
+  npx handoff-cdn skill install     Install Handoff-CDN as a Claude Skill
 
 Examples:
-  npx clawbridge use aerodrop | claude
-  claude -p "$(npx clawbridge use luxar-vault)"
-  npx clawbridge use visionsynth > prompt.txt && claude < prompt.txt
+  npx handoff-cdn use aerodrop | claude
+  claude -p "$(npx handoff-cdn use luxar-vault)"
+  npx handoff-cdn use visionsynth > prompt.txt && claude < prompt.txt
 
 Protocol: https://github.com/miikeey1100/Claude-Design-Handoff-Vault
 `);
@@ -96,7 +96,7 @@ if (cmd === 'manifest') {
 }
 
 if (cmd === 'list') {
-  stdout.write(`\nClawBridge Registry  —  ${manifest.bundles.length} bundles\n\n`);
+  stdout.write(`\nHandoff-CDN Registry  —  ${manifest.bundles.length} bundles\n\n`);
   for (const b of manifest.bundles)
     stdout.write(`  ${b.slug.padEnd(16)} ${String(b.fidelity).padStart(2)}% fidelity  [${b.family}]  ${b.title}\n`);
   stdout.write(`\nProtocol v${VERSION} · CDN: ${manifest.cdn}\n\n`);
@@ -117,24 +117,24 @@ if (cmd === 'info') {
 
 if (cmd === 'skill') {
   if (arg !== 'install') {
-    stderr.write(`Unknown skill subcommand: "${arg}"\nTry: npx clawbridge skill install\n`);
+    stderr.write(`Unknown skill subcommand: "${arg}"\nTry: npx handoff-cdn skill install\n`);
     exit(1);
   }
   const target = path.join(cwd(), 'CLAUDE.md');
   let existing = '';
   try { existing = await fs.readFile(target, 'utf8'); } catch {}
-  if (existing.includes('ClawBridge Skill')) {
-    stdout.write(`ClawBridge skill already present in ${target}\n`);
+  if (existing.includes('Handoff-CDN Skill')) {
+    stdout.write(`Handoff-CDN skill already present in ${target}\n`);
     exit(0);
   }
   await fs.writeFile(target, existing + SKILL_BLOCK, 'utf8');
-  stdout.write(`✓ ClawBridge skill installed → ${target}\n`);
+  stdout.write(`✓ Handoff-CDN skill installed → ${target}\n`);
   stdout.write(`  Claude Code will now enforce Liquid Glass + Monochrome token rules.\n`);
   exit(0);
 }
 
 if (cmd !== 'use') {
-  stderr.write(`Unknown command: "${cmd}"\nTry: npx clawbridge --help\n`);
+  stderr.write(`Unknown command: "${cmd}"\nTry: npx handoff-cdn --help\n`);
   exit(1);
 }
 
@@ -176,8 +176,8 @@ ${chat.split('\n').slice(0, 60).join('\n')}
 ${html}
 \`\`\`
 
-## ClawBridge Implementation Directive
-You are implementing a ClawBridge bundle. This is a pixel-perfect contract:
+## Handoff-CDN Implementation Directive
+You are implementing a Handoff-CDN bundle. This is a pixel-perfect contract:
 
 1. **Fidelity is non-negotiable.** Target: ${b.fidelity}% CSS match. Do not simplify.
 2. **Preserve all oklch() values.** Never convert to hex or hsl.

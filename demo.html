@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClawBridge — Live Demo</title>
+<title>Handoff-CDN — Live Demo</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -153,7 +153,7 @@
 <body>
 <div class="shell">
   <div class="header">
-    <h1>⬡ ClawBridge</h1>
+    <h1>⬡ Handoff-CDN</h1>
     <p>The Design-to-Code Protocol for Claude — live demo</p>
   </div>
 
@@ -162,7 +162,7 @@
       <div class="dot red"></div>
       <div class="dot yellow"></div>
       <div class="dot green"></div>
-      <span class="titlebar-label">bash — clawbridge demo</span>
+      <span class="titlebar-label">bash — handoff-cdn demo</span>
     </div>
     <div class="terminal" id="terminal"></div>
   </div>
@@ -177,16 +177,16 @@
 
 <script>
 const FRAMES = [
-  { delay: 400,  html: `<div class="line" id="l0"><span class="prompt">$</span><span class="cmd"> npx clawbridge list</span></div>` },
+  { delay: 400,  html: `<div class="line" id="l0"><span class="prompt">$</span><span class="cmd"> npx handoff-cdn list</span></div>` },
   { delay: 900,  html: `<div class="gap"></div>` },
-  { delay: 1000, html: `<div class="line"><span class="dim">ClawBridge Registry — 8 bundles</span></div>` },
+  { delay: 1000, html: `<div class="line"><span class="dim">Handoff-CDN Registry — 8 bundles</span></div>` },
   { delay: 1100, html: `<div class="gap"></div>` },
   { delay: 1150, html: `<div class="line"><span class="accent">  aerodrop      </span><span class="live"> 99%</span><span class="dim"> [Liquid Glass]  AeroDrop — Autonomous AI Delivery</span></div>` },
   { delay: 1220, html: `<div class="line"><span class="accent">  agentic-ops   </span><span class="gold"> 97%</span><span class="dim"> [Monochrome]    Agentic Ops — Swarm Console</span></div>` },
   { delay: 1290, html: `<div class="line"><span class="accent">  luxar-vault   </span><span class="live"> 98%</span><span class="dim"> [Liquid Glass]  Luxar Vault — AI Crypto Wallet</span></div>` },
   { delay: 1360, html: `<div class="line"><span class="accent">  visionsynth   </span><span class="live"> 97%</span><span class="dim"> [Liquid Glass]  VisionSynth — AI Video Generator</span></div>` },
   { delay: 1500, html: `<div class="gap"></div>` },
-  { delay: 1600, html: `<div class="line"><span class="prompt">$</span><span class="cmd"> npx clawbridge use aerodrop | claude</span></div>` },
+  { delay: 1600, html: `<div class="line"><span class="prompt">$</span><span class="cmd"> npx handoff-cdn use aerodrop | claude</span></div>` },
   { delay: 2200, html: `<div class="gap"></div>` },
   { delay: 2300, html: `<div class="line"><span class="dim">  Fetching bundle from CDN...</span></div>` },
   { delay: 2700, html: `<div class="line"><span class="dim">  ✓ AeroDrop.html          <span class="live">27 KB</span></span></div>` },
@@ -194,7 +194,7 @@ const FRAMES = [
   { delay: 3100, html: `<div class="line"><span class="dim">  ✓ chat1.md (intent)      <span class="live">3 KB</span></span></div>` },
   { delay: 3300, html: `<div class="gap"></div>` },
   { delay: 3400, html: `<div class="line"><span class="dim">══════════════════════════════════════════════════</span></div>` },
-  { delay: 3500, html: `<div class="line"><span class="dim">  ClawBridge Protocol · aerodrop · v1.0</span></div>` },
+  { delay: 3500, html: `<div class="line"><span class="dim">  Handoff-CDN Protocol · aerodrop · v1.0</span></div>` },
   { delay: 3550, html: `<div class="line"><span class="dim">  AeroDrop — Autonomous AI Delivery</span></div>` },
   { delay: 3600, html: `<div class="line"><span class="dim">  Family: </span><span class="accent">Liquid Glass</span><span class="dim">  ·  Fidelity: </span><span class="live">99%</span><span class="dim">  ·  CDN: GitHub Raw</span></div>` },
   { delay: 3700, html: `<div class="line"><span class="dim">══════════════════════════════════════════════════</span></div>` },

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Generate "Code Fidelity" comparison screenshots for each bundle.
-// Each PNG has a ClawBridge label overlay injected before capture.
+// Each PNG has a Handoff-CDN label overlay injected before capture.
 // Output: previews/comparisons/<slug>.png  (1920×1080 @2x)
 import { chromium } from 'playwright-chromium';
 import { mkdir, readFile, stat, readFile as rf } from 'node:fs/promises';
@@ -64,7 +64,7 @@ for (const b of manifest.bundles) {
     const colors = FAMILY_COLORS[b.family];
     await page.evaluate(({ slug, fidelity, family, bgColor, textColor }) => {
       const badge = document.createElement('div');
-      badge.setAttribute('data-clawbridge', 'overlay');
+      badge.setAttribute('data-handoff-cdn', 'overlay');
       badge.style.cssText = [
         'position:fixed', 'top:16px', 'right:16px', 'z-index:2147483647',
         `background:${bgColor}`, `color:${textColor}`,
@@ -74,7 +74,7 @@ for (const b of manifest.bundles) {
         'display:flex', 'flex-direction:column', 'gap:2px',
         'line-height:1.4', 'pointer-events:none',
       ].join(';');
-      badge.innerHTML = `<span>ClawBridge · ${slug}</span><span>${family} · ${fidelity}% Fidelity</span>`;
+      badge.innerHTML = `<span>Handoff-CDN · ${slug}</span><span>${family} · ${fidelity}% Fidelity</span>`;
       document.body.appendChild(badge);
     }, { slug: b.slug, fidelity: b.fidelity, family: b.family, bgColor: colors.bg, textColor: colors.text });
 

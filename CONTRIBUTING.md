@@ -1,4 +1,4 @@
-# Contributing to ClawBridge
+# Contributing to Handoff-CDN
 
 Thanks for adding to the protocol. Here's how to submit a bundle.
 
@@ -70,14 +70,14 @@ Both scripts auto-detect new entries from `manifest.json`. Commit both PNGs.
 Add a row to the correct gallery table in [README.md](README.md):
 
 ```markdown
-| ![YourSlug](previews/comparisons/your-slug.png) | **YourApp**<br>Short tagline | Liquid Glass | **95% CSS Match** | `npx clawbridge use your-slug` |
+| ![YourSlug](previews/comparisons/your-slug.png) | **YourApp**<br>Short tagline | Liquid Glass | **95% CSS Match** | `npx handoff-cdn use your-slug` |
 ```
 
 Elite Tier (top table) = fidelity ≥ 97%. Extended Library (bottom table) = everything else.
 
-## 6. Update `bin/clawbridge.js` (if your primary file has a non-standard path)
+## 6. Update `bin/handoff-cdn.js` (if your primary file has a non-standard path)
 
-The CLI reads all routing from `manifest.json`, so in most cases no change is needed. Only update if your bundle has unusual file paths that `clawbridge` can't infer.
+The CLI reads all routing from `manifest.json`, so in most cases no change is needed. Only update if your bundle has unusual file paths that `handoff-cdn` can't infer.
 
 ## 7. Open a PR
 

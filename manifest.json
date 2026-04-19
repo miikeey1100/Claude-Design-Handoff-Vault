@@ -1,11 +1,11 @@
 {
-  "protocol": "clawbridge",
+  "protocol": "handoff-cdn",
   "version": "1.0.0",
   "updated": "2026-04-19",
   "cdn": "https://raw.githubusercontent.com/miikeey1100/Claude-Design-Handoff-Vault/main",
   "repo": "https://github.com/miikeey1100/Claude-Design-Handoff-Vault",
-  "install": "npx clawbridge use <slug>",
-  "skill": "npx clawbridge skill install",
+  "install": "npx handoff-cdn use <slug>",
+  "skill": "npx handoff-cdn skill install",
   "families": ["Liquid Glass", "Monochrome"],
   "bundles": [
     {

@@ -1,10 +1,10 @@
 {
-  "name": "clawkit",
+  "name": "handoff-cdn",
   "version": "0.3.0",
-  "description": "ClawBridge — The Design-to-Code Protocol for Claude. Stream high-fidelity UI bundles into Claude Code instantly.",
+  "description": "Handoff-CDN — The Design-to-Code Protocol for Claude. Stream high-fidelity UI bundles into Claude Code instantly.",
   "type": "module",
   "bin": {
-    "clawbridge": "./bin/clawbridge.js",
+    "handoff-cdn": "./bin/handoff-cdn.js",
     "clawkit": "./bin/clawkit"
   },
   "scripts": {

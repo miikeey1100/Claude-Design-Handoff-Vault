@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-**ClawBridge** — a Design-to-Code protocol. It is an npm package (`clawbridge`/`clawkit` binaries) that fetches self-contained HTML/CSS/JS design bundles from a GitHub Raw CDN and pipes them as structured implementation prompts into Claude Code.
+**Handoff-CDN** — a Design-to-Code protocol. It is an npm package (`handoff-cdn`/`clawkit` binaries) that fetches self-contained HTML/CSS/JS design bundles from a GitHub Raw CDN and pipes them as structured implementation prompts into Claude Code.
 
 ```
-npx clawbridge use aerodrop | claude
+npx handoff-cdn use aerodrop | claude
 ```
 
 The repo has two roles simultaneously: (1) a CDN of 8 design bundles, and (2) a published CLI that consumers `npx`-run without cloning.
@@ -23,12 +23,12 @@ npm run setup      # npm install + npx playwright install chromium
 npm run capture    # Playwright: render all 8 bundles → previews/<slug>.png
 npm run compare    # Playwright: render + inject fidelity badge → previews/comparisons/<slug>.png
 
-node bin/clawbridge.js --help
-node bin/clawbridge.js list
-node bin/clawbridge.js use <slug>         # streams bundle prompt to stdout
-node bin/clawbridge.js info <slug>        # JSON metadata
-node bin/clawbridge.js manifest           # full CDN registry
-node bin/clawbridge.js skill install      # appends ClawBridge block to ./CLAUDE.md
+node bin/handoff-cdn.js --help
+node bin/handoff-cdn.js list
+node bin/handoff-cdn.js use <slug>         # streams bundle prompt to stdout
+node bin/handoff-cdn.js info <slug>        # JSON metadata
+node bin/handoff-cdn.js manifest           # full CDN registry
+node bin/handoff-cdn.js skill install      # appends Handoff-CDN block to ./CLAUDE.md
 ```
 
 There are no tests, no lint step, and no build step. The scripts run directly with Node 20+ ESM.
@@ -41,7 +41,7 @@ There are no tests, no lint step, and no build step. The scripts run directly wi
 
 ```
 manifest.json          Single source of truth — all bundle metadata, CDN base URL, family tags
-bin/clawbridge.js      Fetch layer — reads manifest (local first, CDN fallback), builds prompt
+bin/handoff-cdn.js      Fetch layer — reads manifest (local first, CDN fallback), builds prompt
 bin/clawkit            Legacy binary — hardcoded BUNDLES map, kept for backward compat
 scripts/capture.mjs    Playwright capture — spins up a node:http server over bundles/, screenshots
 scripts/compare.mjs    Same as capture but reads manifest and injects a fidelity badge via page.evaluate()
@@ -49,7 +49,7 @@ scripts/compare.mjs    Same as capture but reads manifest and injects a fidelity
 
 ### `manifest.json` is the single registry
 
-Both `bin/clawbridge.js` and `scripts/compare.mjs` read `manifest.json` at runtime. When you add a bundle, add it to `manifest.json` — the scripts derive all paths from it. `bin/clawkit` has a **hardcoded** BUNDLES map and does **not** read manifest; update it separately if you need the old binary to know a new slug.
+Both `bin/handoff-cdn.js` and `scripts/compare.mjs` read `manifest.json` at runtime. When you add a bundle, add it to `manifest.json` — the scripts derive all paths from it. `bin/clawkit` has a **hardcoded** BUNDLES map and does **not** read manifest; update it separately if you need the old binary to know a new slug.
 
 ### Why the local HTTP server in capture scripts
 
@@ -60,7 +60,7 @@ Bundles that load JSX via Babel standalone (`aerodrop`, `holowallet`, `visionsyn
 ```
 bundles/<slug>/
   README.md            Handoff README from claude.ai/design — do not edit
-  chats/chat1.md       Original user intent transcript — required for clawbridge use
+  chats/chat1.md       Original user intent transcript — required for handoff-cdn use
   project/             Primary HTML + any supporting JSX, CSS, images
 ```
 
@@ -68,7 +68,7 @@ The primary HTML file is self-contained: React loaded from unpkg CDN, all styles
 
 ### Design families — two only, no mixing
 
-Every bundle belongs to exactly one family. The family is declared in `manifest.json` and enforced by `CLAUDE.md`. Both `bin/clawbridge.js` and `SKILL.md` embed the token sets.
+Every bundle belongs to exactly one family. The family is declared in `manifest.json` and enforced by `CLAUDE.md`. Both `bin/handoff-cdn.js` and `SKILL.md` embed the token sets.
 
 | Family | Bundles | Key rule |
 |---|---|---|
@@ -91,7 +91,7 @@ CI (`.github/workflows/previews.yml`) runs both scripts on push to main and comm
 
 ## Design contract (enforced below — do not remove)
 
-> This repo is published as the **`clawbridge`** npm package. When `npx clawbridge use <slug>` pipes a bundle into Claude Code, it includes this design contract automatically. Do not deviate from the token families below.
+> This repo is published as the **`handoff-cdn`** npm package. When `npx handoff-cdn use <slug>` pipes a bundle into Claude Code, it includes this design contract automatically. Do not deviate from the token families below.
 
 > Every preview in `/previews` belongs to one of two families. Pick one. Do not mix.
 
