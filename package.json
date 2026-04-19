@@ -12,7 +12,14 @@
     "compare": "node scripts/compare.mjs",
     "setup": "npm install && npx playwright install chromium"
   },
-  "keywords": ["claude", "claude-code", "design", "ui", "handoff", "playwright"],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "design",
+    "ui",
+    "handoff",
+    "playwright"
+  ],
   "author": "miikeey1100",
   "license": "MIT",
   "repository": {
@@ -20,6 +27,8 @@
     "url": "https://github.com/miikeey1100/Claude-Design-Handoff-Vault.git"
   },
   "devDependencies": {
-    "playwright-chromium": "^1.48.0"
+    "omggif": "^1.0.10",
+    "playwright-chromium": "^1.48.0",
+    "pngjs": "^7.0.0"
   }
 }

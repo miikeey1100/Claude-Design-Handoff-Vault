@@ -31,6 +31,8 @@ Every bundle ships with its full HTML prototype, design-token family, and the or
 
 ## Magic Command
 
+![Handoff-CDN demo](marketing/demo.gif)
+
 ```bash
 npx handoff-cdn use aerodrop | claude
 ```
