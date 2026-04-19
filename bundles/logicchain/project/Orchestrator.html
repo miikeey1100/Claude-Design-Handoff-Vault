@@ -1,0 +1,1410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>LogicChain // Orchestrator</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ========== INDUSTRIAL MINIMALISM :: 4PX BASELINE ========== */
+  :root{
+    --bg:        oklch(0.16 0.004 240);
+    --bg-1:      oklch(0.19 0.004 240);
+    --bg-2:      oklch(0.22 0.004 240);
+    --bg-3:      oklch(0.26 0.005 240);
+    --line:      oklch(0.32 0.006 240);
+    --line-2:    oklch(0.40 0.008 240);
+    --ink:       oklch(0.96 0.005 80);
+    --ink-2:     oklch(0.78 0.008 80);
+    --ink-3:     oklch(0.56 0.010 80);
+    --ink-4:     oklch(0.42 0.010 80);
+    --amber:     oklch(0.80 0.17 75);
+    --amber-d:   oklch(0.62 0.16 70);
+    --red:       oklch(0.66 0.22 25);
+    --red-d:     oklch(0.48 0.20 25);
+    --yellow:    oklch(0.86 0.16 95);
+    --green:     oklch(0.78 0.16 155);
+    --blue:      oklch(0.72 0.13 235);
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0;}
+  html,body{ background:var(--bg); color:var(--ink); font-family:var(--mono); font-size:12px; line-height:16px; -webkit-font-smoothing:antialiased;}
+  body{
+    min-height:100vh;
+    background-image:
+      linear-gradient(var(--bg-1) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-1) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: -1px -1px;
+  }
+
+  button, input, select{ font:inherit; color:inherit; background:none; border:none; }
+  button{ cursor:pointer; }
+
+  .mono{ font-family:var(--mono); }
+  .sans{ font-family:var(--sans); }
+  .u{ text-transform:uppercase; letter-spacing:0.16em; }
+  .uu{ text-transform:uppercase; letter-spacing:0.28em; }
+  .uuu{ text-transform:uppercase; letter-spacing:0.40em; }
+
+  /* ========== PAGE FRAME ========== */
+  .app{
+    width:1440px;
+    margin:0 auto;
+    border-left:1px solid var(--line);
+    border-right:1px solid var(--line);
+    background:var(--bg);
+  }
+
+  /* Top command bar */
+  .cmd{
+    display:grid;
+    grid-template-columns: 260px 1fr 320px;
+    height:48px;
+    border-bottom:1px solid var(--line);
+    align-items:stretch;
+  }
+  .cmd > *{ display:flex; align-items:center; padding:0 16px; }
+  .cmd .brand{ border-right:1px solid var(--line); gap:12px; }
+  .cmd .brand .mark{ width:20px; height:20px; background:var(--amber); position:relative;}
+  .cmd .brand .mark::after{ content:""; position:absolute; inset:4px; background:var(--bg); }
+  .cmd .brand .mark::before{ content:""; position:absolute; inset:8px; background:var(--amber); }
+  .cmd .brand .name{ font-family:var(--sans); font-weight:600; font-size:14px; letter-spacing:0.24em; }
+  .cmd .brand .rev{ color:var(--ink-3); margin-left:auto; font-size:10px; letter-spacing:0.2em; }
+
+  .cmd .breadcrumbs{ gap:16px; color:var(--ink-3); font-size:10px; letter-spacing:0.3em; }
+  .cmd .breadcrumbs b{ color:var(--ink); font-weight:500; }
+  .cmd .breadcrumbs .sep{ color:var(--ink-4); }
+
+  .cmd .session{ border-left:1px solid var(--line); gap:16px; justify-content:flex-end; font-size:10px; letter-spacing:0.22em; color:var(--ink-3);}
+  .cmd .session .dot{ width:6px; height:6px; background:var(--green); display:inline-block; margin-right:6px; animation:pulse 2s infinite;}
+
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+  /* Secondary bar - status ticker */
+  .ticker{
+    display:grid;
+    grid-template-columns: repeat(8, 1fr);
+    height:44px;
+    border-bottom:1px solid var(--line);
+  }
+  .ticker .cell{
+    padding:8px 12px;
+    border-right:1px solid var(--line);
+    display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .ticker .cell:last-child{ border-right:none; }
+  .ticker .k{ font-size:9px; letter-spacing:0.28em; color:var(--ink-4); text-transform:uppercase; }
+  .ticker .v{ font-size:13px; font-weight:500; font-family:var(--sans); letter-spacing:0.04em; }
+  .ticker .v .delta{ font-family:var(--mono); font-size:10px; margin-left:6px; color:var(--green);}
+  .ticker .v .delta.neg{ color:var(--red); }
+  .ticker .v.warn{ color:var(--yellow); }
+  .ticker .v.crit{ color:var(--red); }
+
+  /* ========== MAIN LAYOUT ========== */
+  .main{
+    display:grid;
+    grid-template-columns: 220px 1fr 336px;
+    min-height: calc(100vh - 48px - 44px);
+  }
+
+  /* LEFT RAIL --------------------------------- */
+  .rail{ border-right:1px solid var(--line); display:flex; flex-direction:column;}
+  .rail .section{ border-bottom:1px solid var(--line); }
+  .rail .head{
+    padding:12px 16px 8px;
+    font-size:9px; letter-spacing:0.32em; color:var(--ink-4); text-transform:uppercase;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .rail .head .idx{ color:var(--ink-4); }
+  .navlist{ padding: 4px 0 12px; }
+  .navlist .item{
+    display:grid; grid-template-columns: 24px 1fr auto;
+    height:28px; padding:0 16px; align-items:center;
+    font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-2);
+    border-left:2px solid transparent;
+  }
+  .navlist .item:hover{ background:var(--bg-1); color:var(--ink);}
+  .navlist .item.on{ background:var(--bg-1); color:var(--ink); border-left-color:var(--amber);}
+  .navlist .item .gl{ font-family:var(--mono); color:var(--ink-4); font-size:10px; }
+  .navlist .item .b{ font-size:9px; color:var(--ink-4); }
+  .navlist .item.on .b{ color:var(--amber); }
+
+  /* Agent fleet list */
+  .agents{ padding:8px 0 12px; }
+  .agent{
+    display:grid; grid-template-columns: 8px 1fr auto; gap:8px;
+    padding:6px 16px; align-items:center; cursor:pointer;
+  }
+  .agent:hover{ background:var(--bg-1); }
+  .agent .bar{ width:2px; height:20px; background:var(--bg-3); justify-self:center;}
+  .agent.ok .bar{ background:var(--green);}
+  .agent.warn .bar{ background:var(--yellow);}
+  .agent.crit .bar{ background:var(--red);}
+  .agent .name{ font-size:10px; letter-spacing:0.08em; color:var(--ink); text-transform:uppercase;}
+  .agent .meta{ font-size:9px; color:var(--ink-4); letter-spacing:0.12em;}
+  .agent .load{ font-size:10px; color:var(--ink-2);}
+
+  /* System snapshot block */
+  .snap{ padding:12px 16px 16px;}
+  .snap .row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:4px 0;
+    border-bottom:1px dashed var(--line);
+  }
+  .snap .row:last-child{ border-bottom:none; }
+  .snap .row .k{ font-size:9px; color:var(--ink-4); letter-spacing:0.22em; text-transform:uppercase;}
+  .snap .row .v{ font-family:var(--mono); font-size:11px; color:var(--ink);}
+
+  /* CENTER -------------------------- */
+  .center{ display:flex; flex-direction:column;}
+
+  /* Map panel */
+  .panel{ border-bottom:1px solid var(--line); }
+  .panel .bar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:8px 16px; border-bottom:1px solid var(--line);
+    height:36px;
+  }
+  .panel .bar .title{ display:flex; align-items:center; gap:12px;}
+  .panel .bar .num{
+    font-size:9px; letter-spacing:0.32em; color:var(--ink-4);
+    background:var(--bg-1); border:1px solid var(--line);
+    padding:2px 8px;
+  }
+  .panel .bar h3{ font-family:var(--sans); font-weight:500; font-size:13px; letter-spacing:0.24em; text-transform:uppercase;}
+  .panel .bar h3 em{ color:var(--amber); font-style:normal; font-weight:500; }
+  .panel .bar .actions{ display:flex; gap:8px; }
+  .chip{
+    font-size:9px; letter-spacing:0.24em; text-transform:uppercase;
+    padding:4px 8px; border:1px solid var(--line); color:var(--ink-3);
+    height:24px; display:flex; align-items:center;
+  }
+  .chip.on{ border-color:var(--amber); color:var(--amber); }
+  .chip:hover{ color:var(--ink); border-color:var(--line-2); }
+
+  /* Map body */
+  .map{
+    position:relative;
+    height:460px;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% 60%, oklch(0.22 0.005 240) 0%, var(--bg) 75%),
+      var(--bg);
+    overflow:hidden;
+  }
+  .map::before{
+    /* grid floor */
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--line) 70%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--line) 70%, transparent) 1px, transparent 1px);
+    background-size: 40px 40px;
+    transform: perspective(1200px) rotateX(58deg) scale(1.6) translateY(60px);
+    transform-origin: center center;
+    mask-image: radial-gradient(ellipse 60% 60% at 50% 55%, #000 20%, transparent 80%);
+    opacity:.55;
+  }
+  .map::after{
+    /* fine grid */
+    content:""; position:absolute; inset:0;
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--line) 45%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--line) 45%, transparent) 1px, transparent 1px);
+    background-size: 8px 8px;
+    transform: perspective(1200px) rotateX(58deg) scale(1.6) translateY(60px);
+    transform-origin: center center;
+    mask-image: radial-gradient(ellipse 50% 50% at 50% 55%, #000 10%, transparent 70%);
+    opacity:.20;
+  }
+  .map svg{ position:absolute; inset:0; width:100%; height:100%; }
+
+  .map .corner{
+    position:absolute; font-size:9px; letter-spacing:0.24em; color:var(--ink-4); text-transform:uppercase;
+    display:flex; gap:10px;
+  }
+  .map .corner.tl{ top:12px; left:16px;}
+  .map .corner.tr{ top:12px; right:16px;}
+  .map .corner.bl{ bottom:12px; left:16px;}
+  .map .corner.br{ bottom:12px; right:16px;}
+  .map .corner b{ color:var(--ink-2); font-weight:400;}
+
+  .map .crosshair{ position:absolute; bottom:60px; right:40px; width:80px; height:80px; pointer-events:none;}
+  .map .crosshair::before, .map .crosshair::after{ content:""; position:absolute; background:var(--ink-4); }
+  .map .crosshair::before{ left:50%; top:0; bottom:0; width:1px; }
+  .map .crosshair::after{ top:50%; left:0; right:0; height:1px; }
+
+  .map .legend{
+    position:absolute; left:16px; bottom:40px;
+    display:flex; flex-direction:column; gap:6px;
+    background:color-mix(in oklab, var(--bg) 80%, transparent);
+    border:1px solid var(--line);
+    padding:10px 12px;
+    backdrop-filter: blur(4px);
+  }
+  .map .legend .lrow{ display:flex; align-items:center; gap:8px; font-size:9px; letter-spacing:0.22em; color:var(--ink-2); text-transform:uppercase;}
+  .map .legend .sw{ width:14px; height:2px; background:var(--amber);}
+  .map .legend .lrow.alt .sw{ background:var(--blue);}
+  .map .legend .lrow.crit .sw{ background:var(--red);}
+
+  /* Route panel dots style etc handled in SVG */
+
+  /* Sub-row under map */
+  .subrow{ display:grid; grid-template-columns: 1fr 1fr 1fr; border-bottom:1px solid var(--line);}
+  .subrow .col{ padding:14px 16px; border-right:1px solid var(--line);}
+  .subrow .col:last-child{ border-right:none;}
+  .subrow .k{ font-size:9px; letter-spacing:0.30em; color:var(--ink-4); text-transform:uppercase; margin-bottom:6px;}
+  .subrow .big{ font-family:var(--sans); font-weight:500; font-size:28px; letter-spacing:-0.01em; line-height:1;}
+  .subrow .big .unit{ font-family:var(--mono); font-size:11px; color:var(--ink-3); margin-left:6px; letter-spacing:0.08em;}
+  .subrow .spark{ height:28px; margin-top:8px;}
+
+  /* Throughput / inflow split */
+  .split{
+    display:grid; grid-template-columns: 1.4fr 1fr;
+    border-bottom:1px solid var(--line);
+  }
+  .split > .panel{ border-bottom:none;}
+  .split > .panel + .panel{ border-left:1px solid var(--line);}
+
+  /* Flow chart */
+  .flow{ padding: 16px; height:220px;}
+  .flow svg{ width:100%; height:100%;}
+
+  /* Order ledger table */
+  .ledger{ padding:0; }
+  .ledger table{ width:100%; border-collapse:collapse; }
+  .ledger th, .ledger td{
+    text-align:left; padding: 8px 12px;
+    font-size:10px; letter-spacing:0.08em;
+    border-bottom:1px solid var(--line);
+    vertical-align:middle;
+  }
+  .ledger th{
+    font-size:9px; letter-spacing:0.28em; color:var(--ink-4); text-transform:uppercase;
+    background:var(--bg-1);
+    font-weight:500;
+    height:32px;
+  }
+  .ledger td{ height:32px; color:var(--ink-2);}
+  .ledger td.id{ color:var(--ink-3); font-size:10px;}
+  .ledger td.num{ text-align:right; font-variant-numeric: tabular-nums; color:var(--ink);}
+  .ledger tr:hover td{ background:var(--bg-1);}
+  .st{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:9px; letter-spacing:0.22em; text-transform:uppercase;
+  }
+  .st::before{ content:""; width:6px; height:6px; background:var(--ink-3);}
+  .st.ok{ color:var(--green);} .st.ok::before{ background:var(--green);}
+  .st.run{ color:var(--amber);} .st.run::before{ background:var(--amber); animation:pulse 1.5s infinite;}
+  .st.hld{ color:var(--yellow);} .st.hld::before{ background:var(--yellow);}
+  .st.blk{ color:var(--red);} .st.blk::before{ background:var(--red);}
+
+  .progress{
+    width:80px; height:4px; background:var(--bg-2); position:relative; overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .progress > span{ position:absolute; inset:0 auto 0 0; background:var(--amber);}
+
+  /* RIGHT RAIL ------------------------------- */
+  .right{ border-left:1px solid var(--line); display:flex; flex-direction:column;}
+
+  /* Alert panel */
+  .alerts{ border-bottom:1px solid var(--line); }
+  .alert{
+    display:grid; grid-template-columns: 4px 1fr;
+    border-bottom:1px solid var(--line);
+  }
+  .alert:last-child{ border-bottom:none;}
+  .alert .sidebar{ background:var(--bg-3); }
+  .alert.crit .sidebar{ background:var(--red);}
+  .alert.warn .sidebar{ background:var(--yellow);}
+  .alert.info .sidebar{ background:var(--blue);}
+  .alert .body{ padding:12px 16px; }
+  .alert .top{ display:flex; justify-content:space-between; font-size:9px; letter-spacing:0.28em; color:var(--ink-4); text-transform:uppercase; margin-bottom:6px;}
+  .alert .top .sku{ color:var(--ink-2); }
+  .alert .ttl{ font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:0.02em; line-height:1.2; margin-bottom:8px;}
+  .alert.crit .ttl b{ color:var(--red); font-weight:500;}
+  .alert.warn .ttl b{ color:var(--yellow); font-weight:500;}
+  .alert .meta{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;}
+  .alert .meta .mk{ font-size:9px; color:var(--ink-4); letter-spacing:0.22em; text-transform:uppercase;}
+  .alert .meta .mv{ font-family:var(--mono); font-size:11px; color:var(--ink); margin-top:2px;}
+  .alert .bar-wrap{ height:2px; background:var(--bg-2); position:relative; margin-bottom:10px;}
+  .alert .bar-wrap span{ position:absolute; inset:0 auto 0 0; background:var(--ink-2);}
+  .alert.crit .bar-wrap span{ background:var(--red);}
+  .alert.warn .bar-wrap span{ background:var(--yellow);}
+  .alert .ticks{ display:flex; justify-content:space-between; font-size:8px; letter-spacing:0.24em; color:var(--ink-4); margin-bottom:12px;}
+  .alert .actions{ display:flex; gap:8px;}
+  .btn{
+    height:24px; padding:0 10px; border:1px solid var(--line);
+    font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--ink-2);
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{ color:var(--ink); border-color:var(--line-2); }
+  .btn.primary{ background:var(--amber); color:var(--bg); border-color:var(--amber);}
+  .btn.primary:hover{ background:var(--ink); border-color:var(--ink); color:var(--bg);}
+  .btn.danger{ color:var(--red); border-color:var(--red-d);}
+
+  /* Risk tolerance panel */
+  .risk{ padding:16px; border-bottom:1px solid var(--line); }
+  .risk .hdr{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;}
+  .risk .hdr .t{ font-family:var(--sans); font-weight:500; font-size:13px; letter-spacing:0.20em; text-transform:uppercase;}
+  .risk .hdr .idx{ font-size:9px; color:var(--ink-4); letter-spacing:0.28em;}
+  .risk .modes{
+    display:grid; grid-template-columns: repeat(4, 1fr);
+    border:1px solid var(--line);
+    margin-bottom:16px;
+    height:28px;
+  }
+  .risk .mode{
+    font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--ink-3);
+    display:flex; align-items:center; justify-content:center;
+    border-right:1px solid var(--line); cursor:pointer;
+  }
+  .risk .mode:last-child{ border-right:none;}
+  .risk .mode.on{ background:var(--amber); color:var(--bg); font-weight:500;}
+  .risk .mode:hover:not(.on){ color:var(--ink);}
+
+  .knob-row{
+    display:grid; grid-template-columns: 108px 1fr;
+    gap:16px; padding:12px 0; border-top:1px solid var(--line);
+    align-items:center;
+  }
+  .knob{
+    width:96px; height:96px; position:relative; cursor:grab;
+    user-select:none;
+  }
+  .knob:active{ cursor:grabbing; }
+  .knob svg{ width:100%; height:100%; }
+  .knob .val{
+    position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center;
+    pointer-events:none;
+  }
+  .knob .val .num{ font-family:var(--sans); font-size:22px; font-weight:500; letter-spacing:-0.01em;}
+  .knob .val .lb{ font-size:9px; color:var(--ink-4); letter-spacing:0.22em; text-transform:uppercase; margin-top:2px;}
+
+  .krmeta{ display:flex; flex-direction:column; gap:6px;}
+  .krmeta .lbl{ font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--ink); font-family:var(--sans); font-weight:500;}
+  .krmeta .desc{ font-size:10px; color:var(--ink-3); line-height:14px;}
+  .krmeta .bounds{ display:flex; justify-content:space-between; font-size:9px; color:var(--ink-4); letter-spacing:0.22em; text-transform:uppercase; margin-top:4px;}
+
+  .risk .outcome{
+    display:grid; grid-template-columns: 1fr 1fr 1fr;
+    border:1px solid var(--line); margin-top:16px;
+  }
+  .risk .oc{
+    padding:10px 12px; border-right:1px solid var(--line);
+  }
+  .risk .oc:last-child{ border-right:none;}
+  .risk .oc .k{ font-size:9px; letter-spacing:0.22em; color:var(--ink-4); text-transform:uppercase;}
+  .risk .oc .v{ font-family:var(--sans); font-size:16px; font-weight:500; margin-top:4px;}
+  .risk .oc.pos .v{ color:var(--green);}
+  .risk .oc.neg .v{ color:var(--red);}
+
+  /* Fleet strip */
+  .fleet{ padding:16px;}
+  .fleet .fh{ display:flex; justify-content:space-between; margin-bottom:12px; font-size:9px; letter-spacing:0.28em; text-transform:uppercase; color:var(--ink-4);}
+  .fleet .fgrid{ display:grid; grid-template-columns: repeat(6, 1fr); gap:4px;}
+  .fleet .fc{ aspect-ratio:1; border:1px solid var(--line); position:relative; display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--ink-3);}
+  .fleet .fc.ok{ background:color-mix(in oklab, var(--green) 14%, transparent); border-color:color-mix(in oklab, var(--green) 40%, transparent); color:var(--green);}
+  .fleet .fc.run{ background:color-mix(in oklab, var(--amber) 14%, transparent); border-color:color-mix(in oklab, var(--amber) 40%, transparent); color:var(--amber);}
+  .fleet .fc.warn{ background:color-mix(in oklab, var(--yellow) 14%, transparent); border-color:color-mix(in oklab, var(--yellow) 40%, transparent); color:var(--yellow);}
+  .fleet .fc.off{ color:var(--ink-4);}
+  .fleet .fc.crit{ background:color-mix(in oklab, var(--red) 18%, transparent); border-color:color-mix(in oklab, var(--red) 55%, transparent); color:var(--red);}
+
+  /* footer */
+  .footer{
+    height:28px; border-top:1px solid var(--line);
+    display:grid; grid-template-columns: 1fr auto 1fr;
+    align-items:center; padding: 0 16px;
+    font-size:9px; letter-spacing:0.28em; color:var(--ink-4); text-transform:uppercase;
+  }
+  .footer .c{ justify-self:center; }
+  .footer .r{ justify-self:end; display:flex; gap:16px;}
+
+  /* scanline tick */
+  .tick{
+    position:absolute; left:0; right:0; top:0; height:1px;
+    background:linear-gradient(90deg, transparent, var(--amber) 50%, transparent);
+    opacity:.5;
+    animation: scan 6s linear infinite;
+  }
+  @keyframes scan{ 0%{top:0} 100%{top:100%} }
+
+  /* small util */
+  .grid-4{ display:grid; gap:4px;}
+  .divider{ height:1px; background:var(--line); }
+  .kv{ display:flex; justify-content:space-between; align-items:baseline; padding:2px 0;}
+  .kv .k{ font-size:9px; color:var(--ink-4); letter-spacing:0.22em; text-transform:uppercase;}
+  .kv .v{ font-family:var(--mono); font-size:11px; color:var(--ink); font-variant-numeric:tabular-nums;}
+
+  /* Tweaks panel */
+  .tweaks{
+    position:fixed; right:16px; bottom:16px;
+    width:280px; background:var(--bg-1); border:1px solid var(--line-2);
+    z-index:50; display:none;
+  }
+  .tweaks.open{ display:block;}
+  .tweaks .tt{ padding:10px 12px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-size:10px; letter-spacing:0.28em; text-transform:uppercase;}
+  .tweaks .tb{ padding:12px; display:flex; flex-direction:column; gap:12px;}
+  .tweaks label{ display:block; font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--ink-3); margin-bottom:4px;}
+  .tweaks input[type=range]{ width:100%;}
+  .tweaks .row{ display:flex; gap:8px;}
+  .tweaks .row > *{ flex:1;}
+
+  .dashed-x{ border-bottom:1px dashed var(--line); }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ================ COMMAND BAR ================ -->
+  <div class="cmd">
+    <div class="brand">
+      <div class="mark"></div>
+      <div class="name">LOGICCHAIN</div>
+      <div class="rev u">R.7.14</div>
+    </div>
+    <div class="breadcrumbs">
+      <span>OPS</span><span class="sep">/</span>
+      <span>ORCHESTRATOR</span><span class="sep">/</span>
+      <b>LIVE THEATER</b>
+      <span class="sep" style="margin-left:auto"></span>
+      <span>GRID</span><span class="sep">·</span>
+      <b>NORAM-04</b>
+      <span class="sep">·</span>
+      <span>NODES <b style="color:var(--ink)">218</b></span>
+      <span class="sep">·</span>
+      <span>FLEET <b style="color:var(--ink)">1,472</b></span>
+    </div>
+    <div class="session">
+      <span><span class="dot"></span>AGENT-SYNC 12MS</span>
+      <span>OP · A. VALENCIA</span>
+      <span id="clock">07:42:18 UTC</span>
+    </div>
+  </div>
+
+  <!-- ================ STATUS TICKER ================ -->
+  <div class="ticker">
+    <div class="cell"><div class="k">Throughput · 1H</div><div class="v">14,220<span class="delta">+3.2%</span></div></div>
+    <div class="cell"><div class="k">On-Time SLA</div><div class="v">96.4<span class="u" style="font-size:10px; color:var(--ink-3)">%</span><span class="delta">+0.8</span></div></div>
+    <div class="cell"><div class="k">Cost Per Unit</div><div class="v">$ 2.814<span class="delta neg">+0.04</span></div></div>
+    <div class="cell"><div class="k">Autonomy Index</div><div class="v" style="color:var(--amber)" id="autoIdx">0.62</div></div>
+    <div class="cell"><div class="k">Stock-Out Risk</div><div class="v warn">MEDIUM / 18</div></div>
+    <div class="cell"><div class="k">Active Exceptions</div><div class="v crit">07</div></div>
+    <div class="cell"><div class="k">CO₂ g/unit</div><div class="v">41.2<span class="delta">−1.6</span></div></div>
+    <div class="cell"><div class="k">Co-Pilot Interv.</div><div class="v">02 / HR</div></div>
+  </div>
+
+  <!-- ================ MAIN ================ -->
+  <div class="main">
+
+    <!-- LEFT RAIL -->
+    <aside class="rail">
+      <div class="section">
+        <div class="head"><span>NAV</span><span class="idx">01 / 05</span></div>
+        <div class="navlist">
+          <div class="item on"><span class="gl">◼</span><span>Theater</span><span class="b">LIVE</span></div>
+          <div class="item"><span class="gl">◻</span><span>Inventory</span><span class="b">218</span></div>
+          <div class="item"><span class="gl">◻</span><span>Procurement</span><span class="b">44</span></div>
+          <div class="item"><span class="gl">◻</span><span>Fleet</span><span class="b">1472</span></div>
+          <div class="item"><span class="gl">◻</span><span>Demand Model</span><span class="b">v8.2</span></div>
+          <div class="item"><span class="gl">◻</span><span>Exceptions</span><span class="b" style="color:var(--red)">07</span></div>
+          <div class="item"><span class="gl">◻</span><span>Policies</span><span class="b">23</span></div>
+          <div class="item"><span class="gl">◻</span><span>Audit Trail</span><span class="b">∞</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="head"><span>Active Agents</span><span class="idx">12 RUN</span></div>
+        <div class="agents">
+          <div class="agent ok"><div class="bar"></div><div><div class="name">Reroute-01</div><div class="meta">GPU·A100 / 148 JOBS</div></div><div class="load">41%</div></div>
+          <div class="agent ok"><div class="bar"></div><div><div class="name">Demand-FCST</div><div class="meta">CPU·64C / STREAM</div></div><div class="load">22%</div></div>
+          <div class="agent warn"><div class="bar"></div><div><div class="name">Allocator-03</div><div class="meta">QUEUE 412 OVER</div></div><div class="load">88%</div></div>
+          <div class="agent ok"><div class="bar"></div><div><div class="name">Loadbuild-NA</div><div class="meta">STABLE</div></div><div class="load">36%</div></div>
+          <div class="agent crit"><div class="bar"></div><div><div class="name">Custom-Broker</div><div class="meta">AWAIT-APPROVAL</div></div><div class="load">—</div></div>
+          <div class="agent ok"><div class="bar"></div><div><div class="name">Carbon-Audit</div><div class="meta">BATCH 08:00</div></div><div class="load">12%</div></div>
+          <div class="agent ok"><div class="bar"></div><div><div class="name">Negotiator-B2</div><div class="meta">15 RFQ OPEN</div></div><div class="load">54%</div></div>
+          <div class="agent warn"><div class="bar"></div><div><div class="name">Yard-Sync-HSV</div><div class="meta">LATENCY 3.2s</div></div><div class="load">67%</div></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="head"><span>System Snapshot</span><span class="idx">03</span></div>
+        <div class="snap">
+          <div class="row"><span class="k">Horizon</span><span class="v">72 H</span></div>
+          <div class="row"><span class="k">Policy Set</span><span class="v">RG-NORAM-v4.1</span></div>
+          <div class="row"><span class="k">Model</span><span class="v">LC-CORE / 8.2.0</span></div>
+          <div class="row"><span class="k">Confidence</span><span class="v">0.924</span></div>
+          <div class="row"><span class="k">Cold Store</span><span class="v">41 / 42</span></div>
+          <div class="row"><span class="k">Last Drift</span><span class="v">04:12 UTC</span></div>
+          <div class="row"><span class="k">Kill Switch</span><span class="v" style="color:var(--red)">ARMED</span></div>
+        </div>
+      </div>
+
+      <div class="section" style="flex:1; display:flex; flex-direction:column; justify-content:flex-end;">
+        <div style="padding:12px 16px;">
+          <div class="u" style="font-size:9px; color:var(--ink-4); margin-bottom:8px;">AUTONOMY HEARTBEAT</div>
+          <svg viewBox="0 0 200 40" width="100%" height="40" preserveAspectRatio="none">
+            <polyline fill="none" stroke="var(--amber)" stroke-width="1"
+              points="0,20 8,20 10,12 14,28 18,20 30,20 32,8 36,32 40,20 60,20 62,16 66,24 70,20 90,20 92,6 96,34 100,20 120,20 124,18 128,22 132,20 160,20 162,10 166,30 170,20 200,20"/>
+          </svg>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER -->
+    <main class="center">
+
+      <!-- 3D ROUTE MAP -->
+      <section class="panel">
+        <div class="bar">
+          <div class="title">
+            <span class="num">01 · THEATER</span>
+            <h3>Live Routes <em>// NORTH AMERICAN GRID</em></h3>
+          </div>
+          <div class="actions">
+            <button class="chip on">ROAD · 284</button>
+            <button class="chip">AIR · 41</button>
+            <button class="chip">RAIL · 22</button>
+            <button class="chip">SEA · 09</button>
+            <button class="chip">◰ ISOMETRIC</button>
+            <button class="chip">RE-CENTER</button>
+          </div>
+        </div>
+
+        <div class="map" id="map">
+          <div class="tick"></div>
+
+          <!-- Map corner overlays -->
+          <div class="corner tl">
+            <span>VIEW</span><b>ISO-34°</b>
+            <span style="margin-left:12px">ZOOM</span><b>1.00×</b>
+          </div>
+          <div class="corner tr">
+            <span>UPDATED</span><b id="mapTime">07:42:18 UTC</b>
+          </div>
+          <div class="corner bl">
+            <span>ROUTES</span><b>356</b>
+            <span style="margin-left:12px">IN-TRANSIT</span><b>1,214,802 UNITS</b>
+          </div>
+          <div class="corner br">
+            <span>LAT 34.25N</span><span>LON 98.50W</span>
+          </div>
+
+          <svg viewBox="0 0 1000 460" preserveAspectRatio="none" id="mapSvg">
+            <defs>
+              <!-- route gradient animation -->
+              <linearGradient id="routeGrad" x1="0" x2="1">
+                <stop offset="0%" stop-color="oklch(0.80 0.17 75)" stop-opacity="0.05"/>
+                <stop offset="50%" stop-color="oklch(0.80 0.17 75)" stop-opacity="1"/>
+                <stop offset="100%" stop-color="oklch(0.80 0.17 75)" stop-opacity="0.05"/>
+              </linearGradient>
+              <linearGradient id="routeGradRed" x1="0" x2="1">
+                <stop offset="0%" stop-color="oklch(0.66 0.22 25)" stop-opacity="0.05"/>
+                <stop offset="50%" stop-color="oklch(0.66 0.22 25)" stop-opacity="1"/>
+                <stop offset="100%" stop-color="oklch(0.66 0.22 25)" stop-opacity="0.05"/>
+              </linearGradient>
+
+              <!-- node marker -->
+              <symbol id="node" viewBox="-10 -10 20 20">
+                <circle r="5" fill="none" stroke="oklch(0.80 0.17 75)" stroke-width="1"/>
+                <circle r="1.5" fill="oklch(0.80 0.17 75)"/>
+              </symbol>
+              <symbol id="nodeHub" viewBox="-14 -14 28 28">
+                <rect x="-8" y="-8" width="16" height="16" fill="none" stroke="oklch(0.96 0.005 80)" stroke-width="1"/>
+                <rect x="-3" y="-3" width="6" height="6" fill="oklch(0.96 0.005 80)"/>
+              </symbol>
+              <symbol id="nodeRisk" viewBox="-12 -12 24 24">
+                <polygon points="0,-7 7,5 -7,5" fill="none" stroke="oklch(0.66 0.22 25)" stroke-width="1"/>
+                <circle r="1.5" fill="oklch(0.66 0.22 25)"/>
+              </symbol>
+            </defs>
+
+            <!-- Landmass silhouette (abstract North America) -->
+            <g fill="none" stroke="oklch(0.32 0.006 240)" stroke-width="1" opacity=".6">
+              <path d="M90,210 C130,150 210,120 300,130 C360,135 390,160 430,150 C500,135 560,120 620,140 C680,160 700,200 720,240 C750,300 760,340 740,360 C700,390 640,395 570,380 C500,365 450,370 400,380 C330,395 260,395 200,370 C140,350 100,310 95,270 Z"/>
+              <path d="M720,150 C760,130 800,140 820,170 L800,210 L770,200 Z"/>
+              <path d="M140,230 L170,260 L155,290 L120,275 Z"/>
+            </g>
+            <!-- Sub regions -->
+            <g fill="none" stroke="oklch(0.28 0.006 240)" stroke-width="1" stroke-dasharray="2 4" opacity=".7">
+              <path d="M230,165 Q320,200 380,225 T540,255 T700,290"/>
+              <path d="M120,295 Q220,310 310,320 T510,330 T710,320"/>
+              <path d="M195,180 L210,350"/>
+              <path d="M400,140 L420,370"/>
+              <path d="M600,130 L620,365"/>
+            </g>
+
+            <!-- grid meridians -->
+            <g stroke="oklch(0.28 0.006 240)" stroke-width="1" opacity=".35">
+              <line x1="0" y1="120" x2="1000" y2="120"/>
+              <line x1="0" y1="200" x2="1000" y2="200"/>
+              <line x1="0" y1="280" x2="1000" y2="280"/>
+              <line x1="0" y1="360" x2="1000" y2="360"/>
+            </g>
+
+            <!-- ROUTES -->
+            <g id="routes" stroke-linecap="round" fill="none">
+              <!-- primary routes -->
+              <path d="M180,300 Q300,220 450,240" stroke="url(#routeGrad)" stroke-width="1.5" stroke-dasharray="3 3"/>
+              <path d="M450,240 Q560,210 680,260" stroke="url(#routeGrad)" stroke-width="1.5" stroke-dasharray="3 3"/>
+              <path d="M680,260 Q730,290 780,310" stroke="url(#routeGrad)" stroke-width="1.5" stroke-dasharray="3 3"/>
+              <path d="M180,300 Q240,350 340,360" stroke="oklch(0.72 0.13 235)" stroke-width="1" stroke-dasharray="2 3" opacity=".7"/>
+              <path d="M340,360 Q460,350 560,340" stroke="oklch(0.72 0.13 235)" stroke-width="1" stroke-dasharray="2 3" opacity=".7"/>
+              <path d="M560,340 Q620,310 700,320" stroke="oklch(0.72 0.13 235)" stroke-width="1" stroke-dasharray="2 3" opacity=".7"/>
+              <!-- risk routes -->
+              <path d="M450,240 Q500,200 580,180 Q640,170 680,190" stroke="url(#routeGradRed)" stroke-width="1.5" stroke-dasharray="2 4"/>
+              <path d="M300,200 Q380,190 450,240" stroke="oklch(0.66 0.22 25)" stroke-width="1" opacity=".8"/>
+              <!-- background routes -->
+              <path d="M250,170 Q320,180 400,190 T560,205 T720,215" stroke="oklch(0.42 0.010 80)" stroke-width="0.75"/>
+              <path d="M150,260 Q260,250 350,245 T500,220 T650,210" stroke="oklch(0.42 0.010 80)" stroke-width="0.75"/>
+              <path d="M120,330 Q230,340 330,330 T530,320 T720,310" stroke="oklch(0.42 0.010 80)" stroke-width="0.75"/>
+            </g>
+
+            <!-- MOVING PACKAGES (dots) -->
+            <g id="packages">
+              <circle r="3" fill="oklch(0.96 0.005 80)">
+                <animateMotion dur="7s" repeatCount="indefinite" path="M180,300 Q300,220 450,240 Q560,210 680,260 Q730,290 780,310"/>
+              </circle>
+              <circle r="2" fill="oklch(0.80 0.17 75)">
+                <animateMotion dur="9s" repeatCount="indefinite" begin="1.4s" path="M180,300 Q300,220 450,240 Q560,210 680,260 Q730,290 780,310"/>
+              </circle>
+              <circle r="2" fill="oklch(0.80 0.17 75)">
+                <animateMotion dur="9s" repeatCount="indefinite" begin="4.2s" path="M180,300 Q300,220 450,240 Q560,210 680,260 Q730,290 780,310"/>
+              </circle>
+              <circle r="2.5" fill="oklch(0.72 0.13 235)">
+                <animateMotion dur="8s" repeatCount="indefinite" path="M180,300 Q240,350 340,360 Q460,350 560,340 Q620,310 700,320"/>
+              </circle>
+              <circle r="2" fill="oklch(0.72 0.13 235)">
+                <animateMotion dur="8s" repeatCount="indefinite" begin="3.5s" path="M180,300 Q240,350 340,360 Q460,350 560,340 Q620,310 700,320"/>
+              </circle>
+              <circle r="2.5" fill="oklch(0.66 0.22 25)">
+                <animateMotion dur="11s" repeatCount="indefinite" path="M450,240 Q500,200 580,180 Q640,170 680,190"/>
+              </circle>
+            </g>
+
+            <!-- NODES -->
+            <use href="#nodeHub" x="180" y="300" width="28" height="28"/>
+            <use href="#nodeHub" x="450" y="240" width="28" height="28"/>
+            <use href="#nodeHub" x="680" y="260" width="28" height="28"/>
+            <use href="#node" x="340" y="360" width="20" height="20"/>
+            <use href="#node" x="560" y="340" width="20" height="20"/>
+            <use href="#node" x="700" y="320" width="20" height="20"/>
+            <use href="#node" x="780" y="310" width="20" height="20"/>
+            <use href="#node" x="300" y="200" width="20" height="20"/>
+            <use href="#node" x="250" y="170" width="20" height="20"/>
+            <use href="#node" x="560" y="205" width="20" height="20"/>
+            <use href="#node" x="650" y="210" width="20" height="20"/>
+            <use href="#node" x="400" y="190" width="20" height="20"/>
+            <use href="#node" x="230" y="340" width="20" height="20"/>
+            <use href="#nodeRisk" x="680" y="190" width="24" height="24"/>
+            <use href="#nodeRisk" x="280" y="250" width="24" height="24"/>
+
+            <!-- Labels -->
+            <g font-family="JetBrains Mono" font-size="8" fill="oklch(0.78 0.008 80)" letter-spacing="1.4">
+              <text x="195" y="295" text-anchor="start">SEA · HUB-01</text>
+              <text x="195" y="305" fill="oklch(0.42 0.010 80)">47.61 / -122.33</text>
+
+              <text x="465" y="235" text-anchor="start">DFW · HUB-04</text>
+              <text x="465" y="245" fill="oklch(0.42 0.010 80)">32.89 / -97.04</text>
+
+              <text x="695" y="255" text-anchor="start">ATL · HUB-07</text>
+              <text x="695" y="265" fill="oklch(0.42 0.010 80)">33.63 / -84.43</text>
+
+              <text x="355" y="355" fill="oklch(0.78 0.008 80)">LAX</text>
+              <text x="575" y="335" fill="oklch(0.78 0.008 80)">HOU</text>
+              <text x="715" y="315" fill="oklch(0.78 0.008 80)">JAX</text>
+              <text x="795" y="305" fill="oklch(0.78 0.008 80)">MIA</text>
+              <text x="260" y="165" fill="oklch(0.78 0.008 80)">YVR</text>
+              <text x="310" y="195" fill="oklch(0.78 0.008 80)">YYC</text>
+              <text x="410" y="185" fill="oklch(0.78 0.008 80)">YWG</text>
+              <text x="570" y="200" fill="oklch(0.78 0.008 80)">YYZ</text>
+              <text x="660" y="205" fill="oklch(0.78 0.008 80)">YUL</text>
+
+              <text x="695" y="185" fill="oklch(0.66 0.22 25)">⚠ CUSTOMS HOLD · YUL→EWR</text>
+              <text x="290" y="248" fill="oklch(0.66 0.22 25)">⚠ WX ADVISORY · 340SW</text>
+            </g>
+
+            <!-- crosshair target -->
+            <g stroke="oklch(0.80 0.17 75)" stroke-width="1" fill="none">
+              <circle cx="450" cy="240" r="18" stroke-dasharray="2 3"/>
+              <circle cx="450" cy="240" r="32" stroke-dasharray="2 4" opacity=".45"/>
+            </g>
+          </svg>
+
+          <div class="legend">
+            <div class="lrow"><span class="sw"></span>ROAD · PRIMARY</div>
+            <div class="lrow alt"><span class="sw"></span>RAIL · PRIMARY</div>
+            <div class="lrow crit"><span class="sw"></span>AT-RISK SEGMENT</div>
+          </div>
+          <div class="crosshair"></div>
+        </div>
+
+        <!-- Sub row under map -->
+        <div class="subrow">
+          <div class="col">
+            <div class="k">Units In-Transit</div>
+            <div class="big">1.21<span class="unit">M · +3.2% / H</span></div>
+            <svg class="spark" viewBox="0 0 200 28" preserveAspectRatio="none">
+              <polyline fill="none" stroke="var(--amber)" stroke-width="1.25" points="0,18 12,16 24,20 36,14 48,17 60,12 72,16 84,10 96,13 108,8 120,11 132,6 144,10 156,7 168,9 180,5 192,8 200,4"/>
+              <polyline fill="none" stroke="var(--ink-4)" stroke-width="0.75" stroke-dasharray="2 3" points="0,22 20,20 40,22 60,19 80,20 100,18 120,19 140,17 160,18 180,16 200,17"/>
+            </svg>
+          </div>
+          <div class="col">
+            <div class="k">Avg Lead Time</div>
+            <div class="big">22.8<span class="unit">H · −1.1 VS 7D</span></div>
+            <svg class="spark" viewBox="0 0 200 28" preserveAspectRatio="none">
+              <polyline fill="none" stroke="var(--green)" stroke-width="1.25" points="0,6 16,9 32,7 48,12 64,10 80,15 96,13 112,18 128,16 144,20 160,18 176,22 192,20 200,23"/>
+            </svg>
+          </div>
+          <div class="col">
+            <div class="k">Autonomous Decisions / Min</div>
+            <div class="big">1,840<span class="unit">OPS · P95 12MS</span></div>
+            <svg class="spark" viewBox="0 0 200 28" preserveAspectRatio="none">
+              <g stroke="var(--blue)" stroke-width="1">
+                <line x1="4" y1="24" x2="4" y2="8"/><line x1="12" y1="24" x2="12" y2="14"/>
+                <line x1="20" y1="24" x2="20" y2="6"/><line x1="28" y1="24" x2="28" y2="12"/>
+                <line x1="36" y1="24" x2="36" y2="10"/><line x1="44" y1="24" x2="44" y2="4"/>
+                <line x1="52" y1="24" x2="52" y2="11"/><line x1="60" y1="24" x2="60" y2="7"/>
+                <line x1="68" y1="24" x2="68" y2="15"/><line x1="76" y1="24" x2="76" y2="9"/>
+                <line x1="84" y1="24" x2="84" y2="5"/><line x1="92" y1="24" x2="92" y2="13"/>
+                <line x1="100" y1="24" x2="100" y2="8"/><line x1="108" y1="24" x2="108" y2="10"/>
+                <line x1="116" y1="24" x2="116" y2="6"/><line x1="124" y1="24" x2="124" y2="14"/>
+                <line x1="132" y1="24" x2="132" y2="9"/><line x1="140" y1="24" x2="140" y2="11"/>
+                <line x1="148" y1="24" x2="148" y2="4"/><line x1="156" y1="24" x2="156" y2="7"/>
+                <line x1="164" y1="24" x2="164" y2="12"/><line x1="172" y1="24" x2="172" y2="8"/>
+                <line x1="180" y1="24" x2="180" y2="6"/><line x1="188" y1="24" x2="188" y2="10"/>
+                <line x1="196" y1="24" x2="196" y2="5"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- FLOW CHART + LEDGER -->
+      <section class="split">
+        <div class="panel">
+          <div class="bar">
+            <div class="title">
+              <span class="num">02 · DEMAND</span>
+              <h3>Forecast <em>// 72H HORIZON</em></h3>
+            </div>
+            <div class="actions">
+              <button class="chip">P50</button>
+              <button class="chip on">P50 / P95</button>
+              <button class="chip">ACTUAL</button>
+              <button class="chip">Δ RESIDUAL</button>
+            </div>
+          </div>
+          <div class="flow">
+            <svg viewBox="0 0 600 220" preserveAspectRatio="none">
+              <!-- axes -->
+              <g stroke="var(--line)" stroke-width="1">
+                <line x1="40" y1="20" x2="40" y2="190"/>
+                <line x1="40" y1="190" x2="590" y2="190"/>
+              </g>
+              <g stroke="var(--line)" stroke-width="1" stroke-dasharray="2 4" opacity=".6">
+                <line x1="40" y1="60" x2="590" y2="60"/>
+                <line x1="40" y1="110" x2="590" y2="110"/>
+                <line x1="40" y1="150" x2="590" y2="150"/>
+                <line x1="260" y1="20" x2="260" y2="190"/>
+                <line x1="420" y1="20" x2="420" y2="190"/>
+              </g>
+              <!-- Y labels -->
+              <g font-family="JetBrains Mono" font-size="8" fill="var(--ink-4)" letter-spacing="1.2" text-anchor="end">
+                <text x="34" y="24">40K</text>
+                <text x="34" y="64">30K</text>
+                <text x="34" y="114">20K</text>
+                <text x="34" y="154">10K</text>
+                <text x="34" y="193">0</text>
+              </g>
+              <!-- X labels -->
+              <g font-family="JetBrains Mono" font-size="8" fill="var(--ink-4)" letter-spacing="1.2" text-anchor="middle">
+                <text x="40" y="205">NOW</text>
+                <text x="150" y="205">+12H</text>
+                <text x="260" y="205">+24H</text>
+                <text x="370" y="205">+48H</text>
+                <text x="480" y="205">+60H</text>
+                <text x="590" y="205">+72H</text>
+              </g>
+
+              <!-- P95 band -->
+              <path d="M40,130 C80,90 130,80 180,70 C240,55 290,60 340,45 C400,32 450,55 500,60 C540,62 570,55 590,50
+                       L590,105 C570,120 540,110 500,108 C450,95 400,100 340,110 C290,120 240,108 180,120 C130,128 80,135 40,160 Z"
+                    fill="oklch(0.80 0.17 75 / 0.12)" stroke="none"/>
+              <!-- P95 top/bottom lines -->
+              <path d="M40,130 C80,90 130,80 180,70 C240,55 290,60 340,45 C400,32 450,55 500,60 C540,62 570,55 590,50"
+                    fill="none" stroke="oklch(0.80 0.17 75)" stroke-width="0.75" stroke-dasharray="2 3" opacity=".6"/>
+              <path d="M40,160 C80,135 130,128 180,120 C240,108 290,120 340,110 C400,100 450,95 500,108 C540,110 570,120 590,105"
+                    fill="none" stroke="oklch(0.80 0.17 75)" stroke-width="0.75" stroke-dasharray="2 3" opacity=".6"/>
+
+              <!-- Actual (pre-NOW) solid -->
+              <path d="M40,150 C60,142 80,155 100,146 C120,138 140,148 160,140 C180,132 200,146 220,134 C240,125 250,132 258,128"
+                    fill="none" stroke="oklch(0.96 0.005 80)" stroke-width="1.5"/>
+              <!-- Forecast P50 -->
+              <path d="M258,128 C300,118 340,90 380,88 C420,86 460,82 500,90 C540,96 565,92 590,78"
+                    fill="none" stroke="oklch(0.80 0.17 75)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+              <!-- Event markers -->
+              <g>
+                <line x1="380" y1="20" x2="380" y2="190" stroke="oklch(0.66 0.22 25)" stroke-width="1" stroke-dasharray="2 2" opacity=".7"/>
+                <text x="384" y="30" font-family="JetBrains Mono" font-size="8" fill="oklch(0.66 0.22 25)" letter-spacing="1.2">PROMO · APP-S2 · +38%</text>
+              </g>
+              <g>
+                <line x1="500" y1="20" x2="500" y2="190" stroke="oklch(0.86 0.16 95)" stroke-width="1" stroke-dasharray="2 2" opacity=".7"/>
+                <text x="504" y="30" font-family="JetBrains Mono" font-size="8" fill="oklch(0.86 0.16 95)" letter-spacing="1.2">WX · GULF LOW</text>
+              </g>
+
+              <!-- NOW marker -->
+              <g>
+                <line x1="258" y1="20" x2="258" y2="190" stroke="oklch(0.96 0.005 80)" stroke-width="1"/>
+                <circle cx="258" cy="128" r="3" fill="oklch(0.96 0.005 80)"/>
+                <text x="264" y="28" font-family="JetBrains Mono" font-size="8" fill="oklch(0.96 0.005 80)" letter-spacing="1.4">NOW · 07:42</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="bar">
+            <div class="title">
+              <span class="num">03 · POLICY</span>
+              <h3>Heat <em>// COST vs SERVICE</em></h3>
+            </div>
+            <div class="actions">
+              <button class="chip on">COST/SVC</button>
+              <button class="chip">CO₂</button>
+            </div>
+          </div>
+          <div class="flow">
+            <svg viewBox="0 0 340 220" preserveAspectRatio="none">
+              <g stroke="var(--line)" stroke-width="1">
+                <line x1="40" y1="20" x2="40" y2="180"/>
+                <line x1="40" y1="180" x2="320" y2="180"/>
+              </g>
+              <g font-family="JetBrains Mono" font-size="8" fill="var(--ink-4)" letter-spacing="1.2">
+                <text x="36" y="24" text-anchor="end">HIGH</text>
+                <text x="36" y="184" text-anchor="end">LOW</text>
+                <text x="40" y="198">SERVICE →</text>
+                <text x="320" y="198" text-anchor="end">COST →</text>
+              </g>
+              <!-- Heat grid 5x5 cells, intensities -->
+              <g id="heat">
+                <!-- generated via JS -->
+              </g>
+              <!-- frontier curve -->
+              <path d="M60,170 Q140,140 200,100 T300,50" fill="none" stroke="var(--amber)" stroke-width="1.25" stroke-dasharray="3 3"/>
+              <circle cx="180" cy="112" r="5" fill="none" stroke="var(--ink)" stroke-width="1.25"/>
+              <circle cx="180" cy="112" r="1.5" fill="var(--ink)"/>
+              <text x="188" y="110" font-family="JetBrains Mono" font-size="8" fill="var(--ink)" letter-spacing="1.2">CURRENT</text>
+              <text x="188" y="122" font-family="JetBrains Mono" font-size="8" fill="var(--ink-3)" letter-spacing="1.2">RG-NORAM-v4.1</text>
+
+              <circle cx="240" cy="80" r="4" fill="none" stroke="var(--amber)" stroke-width="1"/>
+              <text x="248" y="78" font-family="JetBrains Mono" font-size="8" fill="var(--amber)" letter-spacing="1.2">RECOMMEND</text>
+              <text x="248" y="90" font-family="JetBrains Mono" font-size="8" fill="var(--ink-3)" letter-spacing="1.2">+SERVICE 1.4 / +COST $0.02</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- ORDER LEDGER -->
+      <section class="panel">
+        <div class="bar">
+          <div class="title">
+            <span class="num">04 · LEDGER</span>
+            <h3>Autonomous Decisions <em>// LAST 600s</em></h3>
+          </div>
+          <div class="actions">
+            <button class="chip">ALL · 412</button>
+            <button class="chip on">CRIT · 18</button>
+            <button class="chip">REROUTE</button>
+            <button class="chip">SUBSTITUTE</button>
+            <button class="chip">HOLD</button>
+            <button class="chip">EXPORT ↓</button>
+          </div>
+        </div>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:110px">TS / UTC</th>
+                <th style="width:110px">TICKET</th>
+                <th>SKU · LANE</th>
+                <th>AGENT</th>
+                <th>ACTION</th>
+                <th style="width:90px">CONF</th>
+                <th style="width:90px">SAVINGS</th>
+                <th style="width:110px">STATE</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerBody">
+              <!-- generated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- RIGHT RAIL -->
+    <aside class="right">
+
+      <!-- STOCK-OUT ALERT PANEL -->
+      <section class="panel alerts">
+        <div class="bar" style="border-bottom:1px solid var(--line);">
+          <div class="title">
+            <span class="num">A · ALERTS</span>
+            <h3 style="font-size:12px;">Stock-Out Forecast</h3>
+          </div>
+          <div class="actions"><button class="chip on">18</button></div>
+        </div>
+
+        <div class="alert crit">
+          <div class="sidebar"></div>
+          <div class="body">
+            <div class="top"><span>CRIT · 01</span><span class="sku">SKU APP-S2-BLK-M</span></div>
+            <div class="ttl"><b>Stock-out in 4h 12m</b> · DFW-HUB-04</div>
+            <div class="meta">
+              <div><div class="mk">On-Hand</div><div class="mv">812 U</div></div>
+              <div><div class="mk">Burn Rate</div><div class="mv">193 U/h</div></div>
+              <div><div class="mk">Next Inbound</div><div class="mv">+18H (ETA 01:54)</div></div>
+              <div><div class="mk">Confidence</div><div class="mv">0.94</div></div>
+            </div>
+            <div class="ticks"><span>NOW</span><span>+1H</span><span>+2H</span><span>+3H</span><span>+4H</span><span>+5H</span></div>
+            <div class="bar-wrap"><span style="width:72%"></span></div>
+            <div class="actions">
+              <button class="btn primary">◳ EXPEDITE AIR</button>
+              <button class="btn">◈ SUBSTITUTE</button>
+              <button class="btn">SUPPRESS</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert crit">
+          <div class="sidebar"></div>
+          <div class="body">
+            <div class="top"><span>CRIT · 02</span><span class="sku">SKU BIO-SERUM-120</span></div>
+            <div class="ttl"><b>Stock-out in 9h 48m</b> · SEA-HUB-01</div>
+            <div class="meta">
+              <div><div class="mk">On-Hand</div><div class="mv">2,140 U</div></div>
+              <div><div class="mk">Burn Rate</div><div class="mv">218 U/h</div></div>
+              <div><div class="mk">Source</div><div class="mv">PDX · RAIL</div></div>
+              <div><div class="mk">Confidence</div><div class="mv">0.89</div></div>
+            </div>
+            <div class="bar-wrap"><span style="width:48%; background:var(--red)"></span></div>
+            <div class="actions">
+              <button class="btn primary">REROUTE PDX→SEA</button>
+              <button class="btn">HOLD</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert warn">
+          <div class="sidebar"></div>
+          <div class="body">
+            <div class="top"><span>WARN · 03</span><span class="sku">SKU CRX-PANEL-Q4</span></div>
+            <div class="ttl"><b>Degraded cover in 28h</b> · ATL-HUB-07</div>
+            <div class="meta">
+              <div><div class="mk">On-Hand</div><div class="mv">6,402 U</div></div>
+              <div><div class="mk">Burn Rate</div><div class="mv">228 U/h</div></div>
+              <div><div class="mk">Inbound</div><div class="mv">+42H</div></div>
+              <div><div class="mk">Confidence</div><div class="mv">0.81</div></div>
+            </div>
+            <div class="bar-wrap"><span style="width:28%; background:var(--yellow)"></span></div>
+            <div class="actions">
+              <button class="btn">PULL FROM MIA</button>
+              <button class="btn">DEFER</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert info">
+          <div class="sidebar"></div>
+          <div class="body">
+            <div class="top"><span>INFO · 04</span><span class="sku">18 OTHER</span></div>
+            <div class="ttl" style="font-size:12px; color:var(--ink-2); letter-spacing:0.06em;">15 warn · 3 watch · show all →</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RISK TOLERANCE KNOBS -->
+      <section class="risk">
+        <div class="hdr">
+          <div class="t">Autonomous Risk</div>
+          <div class="idx">B · POLICY</div>
+        </div>
+        <div class="modes" id="modes">
+          <div class="mode" data-mode="conservative">Conserv.</div>
+          <div class="mode on" data-mode="balanced">Balanced</div>
+          <div class="mode" data-mode="aggressive">Aggress.</div>
+          <div class="mode" data-mode="manual">Manual</div>
+        </div>
+
+        <div class="knob-row" data-knob="tolerance" data-min="0" data-max="100" data-val="62">
+          <div class="knob">
+            <svg viewBox="0 0 100 100">
+              <!-- ticks -->
+              <g stroke="var(--ink-4)" stroke-width="0.75">
+                <g transform="translate(50,50)">
+                  <!-- 24 ticks spanning 270deg from -225 to 45 -->
+                </g>
+              </g>
+              <g id="knobTicks-tolerance"></g>
+              <circle cx="50" cy="50" r="36" fill="none" stroke="var(--line)" stroke-width="1"/>
+              <circle cx="50" cy="50" r="30" fill="var(--bg-1)" stroke="var(--line-2)" stroke-width="1"/>
+              <path id="knobArc-tolerance" d="" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="butt"/>
+              <line id="knobInd-tolerance" x1="50" y1="50" x2="50" y2="24" stroke="var(--ink)" stroke-width="1.5"/>
+              <circle cx="50" cy="50" r="2" fill="var(--ink)"/>
+            </svg>
+            <div class="val"><div class="num" id="knobNum-tolerance">62</div><div class="lb">% TOL</div></div>
+          </div>
+          <div class="krmeta">
+            <div class="lbl">Risk Tolerance</div>
+            <div class="desc">Max acceptable prob. of exception before escalating to a human operator.</div>
+            <div class="bounds"><span>SAFE 0</span><span>↕ DRAG</span><span>BOLD 100</span></div>
+          </div>
+        </div>
+
+        <div class="knob-row" data-knob="horizon" data-min="6" data-max="168" data-val="72">
+          <div class="knob">
+            <svg viewBox="0 0 100 100">
+              <g id="knobTicks-horizon"></g>
+              <circle cx="50" cy="50" r="36" fill="none" stroke="var(--line)" stroke-width="1"/>
+              <circle cx="50" cy="50" r="30" fill="var(--bg-1)" stroke="var(--line-2)" stroke-width="1"/>
+              <path id="knobArc-horizon" d="" fill="none" stroke="var(--amber)" stroke-width="2"/>
+              <line id="knobInd-horizon" x1="50" y1="50" x2="50" y2="24" stroke="var(--ink)" stroke-width="1.5"/>
+              <circle cx="50" cy="50" r="2" fill="var(--ink)"/>
+            </svg>
+            <div class="val"><div class="num" id="knobNum-horizon">72</div><div class="lb">HORIZON H</div></div>
+          </div>
+          <div class="krmeta">
+            <div class="lbl">Planning Horizon</div>
+            <div class="desc">How far the orchestrator commits capacity and rate cards without re-negotiation.</div>
+            <div class="bounds"><span>6H</span><span>↕ DRAG</span><span>168H</span></div>
+          </div>
+        </div>
+
+        <div class="knob-row" data-knob="spend" data-min="0" data-max="25000" data-val="8400" data-step="100">
+          <div class="knob">
+            <svg viewBox="0 0 100 100">
+              <g id="knobTicks-spend"></g>
+              <circle cx="50" cy="50" r="36" fill="none" stroke="var(--line)" stroke-width="1"/>
+              <circle cx="50" cy="50" r="30" fill="var(--bg-1)" stroke="var(--line-2)" stroke-width="1"/>
+              <path id="knobArc-spend" d="" fill="none" stroke="var(--amber)" stroke-width="2"/>
+              <line id="knobInd-spend" x1="50" y1="50" x2="50" y2="24" stroke="var(--ink)" stroke-width="1.5"/>
+              <circle cx="50" cy="50" r="2" fill="var(--ink)"/>
+            </svg>
+            <div class="val"><div class="num" id="knobNum-spend">8.4</div><div class="lb">K$ / TICKET</div></div>
+          </div>
+          <div class="krmeta">
+            <div class="lbl">Autonomous Spend Cap</div>
+            <div class="desc">Per-decision budget the agent can commit without human sign-off.</div>
+            <div class="bounds"><span>$0</span><span>↕ DRAG</span><span>$25K</span></div>
+          </div>
+        </div>
+
+        <div class="outcome">
+          <div class="oc pos"><div class="k">Forecast Cost</div><div class="v">−4.8%</div></div>
+          <div class="oc neg"><div class="k">Service Risk</div><div class="v">+1.2%</div></div>
+          <div class="oc"><div class="k">Interventions</div><div class="v" style="color:var(--amber)">2.4 / H</div></div>
+        </div>
+      </section>
+
+      <!-- FLEET -->
+      <section class="fleet">
+        <div class="fh">
+          <span>FLEET HEATMAP · C · 30 LANES</span>
+          <span>1,472 ASSETS</span>
+        </div>
+        <div class="fgrid" id="fgrid"></div>
+      </section>
+
+    </aside>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>SID · LC-ORC-7F2A-3E0C · RBAC OPERATOR+</div>
+    <div class="c">ALL DECISIONS LOGGED · RETENTION 7Y</div>
+    <div class="r"><span>KBD · ⇥ PANEL</span><span>⌘K COMMAND</span><span>ESC HALT</span><span style="color:var(--red)">⇧⌘X KILL</span></div>
+  </div>
+</div>
+
+<!-- TWEAKS -->
+<div class="tweaks" id="tweaksPanel">
+  <div class="tt"><span>TWEAKS</span><button onclick="toggleTweaks(false)" style="color:var(--ink-3);">✕</button></div>
+  <div class="tb">
+    <div>
+      <label>ACCENT</label>
+      <div class="row">
+        <button class="chip" onclick="setAccent('amber')">AMBER</button>
+        <button class="chip" onclick="setAccent('lime')">LIME</button>
+        <button class="chip" onclick="setAccent('cyan')">CYAN</button>
+      </div>
+    </div>
+    <div>
+      <label>DENSITY</label>
+      <input type="range" min="0" max="2" step="1" value="1" oninput="setDensity(this.value)">
+    </div>
+    <div>
+      <label>MAP GRID OPACITY</label>
+      <input type="range" min="0" max="100" value="55" oninput="document.documentElement.style.setProperty('--gridOp', this.value/100); document.querySelector('.map').style.setProperty('--_o', this.value/100);">
+    </div>
+    <div>
+      <label>LIVE TICKING</label>
+      <div class="row">
+        <button class="chip on" id="tkOn" onclick="setTicking(true)">ON</button>
+        <button class="chip" id="tkOff" onclick="setTicking(false)">OFF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= CLOCK ========= */
+const clockEl = document.getElementById('clock');
+const mapTimeEl = document.getElementById('mapTime');
+function tickClock(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const s = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+  clockEl.textContent = s;
+  mapTimeEl.textContent = s;
+}
+tickClock(); setInterval(tickClock, 1000);
+
+/* ========= HEATMAP ========= */
+(function heat(){
+  const g = document.getElementById('heat');
+  const cols = 7, rows = 5;
+  const x0 = 50, y0 = 28, w = 260, h = 150;
+  const cw = w/cols, ch = h/rows;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      // value roughly forms a diagonal peak
+      const d = Math.abs((c/cols) - (1 - r/rows));
+      const v = Math.max(0, 1 - d*1.6) * (0.35 + Math.random()*0.4);
+      const fill = `oklch(0.80 0.17 75 / ${(v*0.7).toFixed(2)})`;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', x0 + c*cw + 1);
+      rect.setAttribute('y', y0 + r*ch + 1);
+      rect.setAttribute('width', cw - 2);
+      rect.setAttribute('height', ch - 2);
+      rect.setAttribute('fill', fill);
+      rect.setAttribute('stroke', 'var(--line)');
+      rect.setAttribute('stroke-width', '0.5');
+      g.appendChild(rect);
+    }
+  }
+})();
+
+/* ========= LEDGER ========= */
+const LEDGER = [
+  ['07:42:11','LC-249381','APP-S2-BLK-M · DFW→ATL','Reroute-01','REROUTE AIR+ROAD','0.97','−$412','RUN'],
+  ['07:42:07','LC-249380','BIO-SERUM-120 · PDX→SEA','Allocator-03','EXPEDITE RAIL','0.92','+$88','RUN'],
+  ['07:42:02','LC-249379','CRX-PANEL-Q4 · MIA→ATL','Loadbuild-NA','CONSOLIDATE','0.88','−$1,204','OK'],
+  ['07:41:58','LC-249378','MDX-COIL-A · YYZ→EWR','Custom-Broker','AWAIT DOCS','0.61','—','HLD'],
+  ['07:41:53','LC-249377','LUM-2X4-8FT · PDX→DEN','Negotiator-B2','REBID CARRIER','0.83','−$660','RUN'],
+  ['07:41:49','LC-249376','APP-S2-WHT-L · DFW→IAH','Reroute-01','SPLIT PO','0.94','−$180','OK'],
+  ['07:41:44','LC-249375','GRN-BEAN-24 · LAX→YVR','Yard-Sync-HSV','HOLD GATE 7','0.71','—','HLD'],
+  ['07:41:38','LC-249374','NTR-BAR-12 · ATL→MIA','Loadbuild-NA','TOPOFF 18%','0.90','+$44','OK'],
+  ['07:41:32','LC-249373','STL-1/2 · HOU→BHM','Reroute-01','ALT LANE I-59','0.96','−$312','OK'],
+  ['07:41:27','LC-249372','APP-S1-BLU-S · YUL→EWR','Custom-Broker','BLOCK · TARIFF','0.58','—','BLK'],
+];
+(function(){
+  const tbody = document.getElementById('ledgerBody');
+  tbody.innerHTML = LEDGER.map(([ts,id,sku,ag,act,conf,sav,st])=>{
+    const cls = st==='OK'?'ok':st==='RUN'?'run':st==='HLD'?'hld':'blk';
+    return `<tr>
+      <td class="id">${ts}</td>
+      <td class="id">${id}</td>
+      <td>${sku}</td>
+      <td style="color:var(--ink-3)">${ag}</td>
+      <td>${act}</td>
+      <td class="num"><div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">${conf}<div class="progress"><span style="width:${Math.round(parseFloat(conf)*100)}%"></span></div></div></td>
+      <td class="num">${sav}</td>
+      <td><span class="st ${cls}">${st}</span></td>
+    </tr>`;
+  }).join('');
+})();
+
+/* ========= FLEET HEAT GRID ========= */
+(function fleet(){
+  const g = document.getElementById('fgrid');
+  const states = ['ok','ok','ok','run','run','warn','ok','off','crit','ok','run','ok'];
+  const n = 42;
+  let html = '';
+  for(let i=0;i<n;i++){
+    const s = states[Math.floor(Math.random()*states.length)];
+    const id = String(i+101).padStart(3,'0');
+    html += `<div class="fc ${s}" title="ASSET-${id}">${id}</div>`;
+  }
+  g.innerHTML = html;
+})();
+
+/* ========= KNOBS ========= */
+function buildKnobTicks(id){
+  const g = document.getElementById('knobTicks-'+id);
+  if(!g) return;
+  // 24 ticks from angle -135deg to +135deg (total 270)
+  const cx=50, cy=50, r1=44, r2=40;
+  const start=-135, end=135, n=24;
+  let s='';
+  for(let i=0;i<=n;i++){
+    const a = (start + (end-start)*i/n) * Math.PI/180;
+    const x1 = cx + Math.cos(a-Math.PI/2)*r1;
+    const y1 = cy + Math.sin(a-Math.PI/2)*r1;
+    const x2 = cx + Math.cos(a-Math.PI/2)*r2;
+    const y2 = cy + Math.sin(a-Math.PI/2)*r2;
+    const major = i%4===0;
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${major?'var(--ink-3)':'var(--ink-4)'}" stroke-width="${major?'1':'0.5'}"/>`;
+  }
+  g.innerHTML = s;
+}
+function updateKnob(id, val){
+  const row = document.querySelector(`[data-knob="${id}"]`);
+  const min = +row.dataset.min, max = +row.dataset.max;
+  val = Math.max(min, Math.min(max, val));
+  row.dataset.val = val;
+  const frac = (val-min)/(max-min);
+  const start=-135, end=135;
+  const angle = start + (end-start)*frac;
+  const a = angle * Math.PI/180;
+  // indicator line
+  const ind = document.getElementById('knobInd-'+id);
+  const len=22;
+  const ix = 50 + Math.cos(a-Math.PI/2)*len;
+  const iy = 50 + Math.sin(a-Math.PI/2)*len;
+  ind.setAttribute('x2', ix.toFixed(2));
+  ind.setAttribute('y2', iy.toFixed(2));
+  // arc
+  const arc = document.getElementById('knobArc-'+id);
+  const r=34;
+  const sa = start*Math.PI/180 - Math.PI/2;
+  const ea = angle*Math.PI/180 - Math.PI/2;
+  const sx = 50 + Math.cos(sa)*r, sy = 50 + Math.sin(sa)*r;
+  const ex = 50 + Math.cos(ea)*r, ey = 50 + Math.sin(ea)*r;
+  const large = (angle-start) > 180 ? 1 : 0;
+  arc.setAttribute('d', `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`);
+  // label
+  const num = document.getElementById('knobNum-'+id);
+  if(id === 'spend'){
+    num.textContent = (val/1000).toFixed(1);
+  } else {
+    num.textContent = Math.round(val);
+  }
+  // global autonomy index reflects tolerance
+  if(id==='tolerance'){
+    document.getElementById('autoIdx').textContent = (0.3 + (val/100)*0.55).toFixed(2);
+  }
+}
+document.querySelectorAll('[data-knob]').forEach(row=>{
+  const id = row.dataset.knob;
+  buildKnobTicks(id);
+  updateKnob(id, +row.dataset.val);
+
+  let dragging=false, startY=0, startVal=0;
+  const knob = row.querySelector('.knob');
+  knob.addEventListener('pointerdown', e=>{
+    dragging=true; startY=e.clientY; startVal=+row.dataset.val;
+    knob.setPointerCapture(e.pointerId);
+  });
+  knob.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const dy = startY - e.clientY;
+    const min = +row.dataset.min, max = +row.dataset.max;
+    const step = +(row.dataset.step||1);
+    const range = max - min;
+    const delta = (dy / 120) * range;
+    let v = startVal + delta;
+    v = Math.round(v/step)*step;
+    updateKnob(id, v);
+  });
+  knob.addEventListener('pointerup', ()=> dragging=false);
+  knob.addEventListener('pointercancel', ()=> dragging=false);
+  // wheel support
+  knob.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const min = +row.dataset.min, max = +row.dataset.max;
+    const step = +(row.dataset.step||1);
+    const dir = -Math.sign(e.deltaY);
+    let v = +row.dataset.val + dir*step*Math.max(1,Math.round((max-min)/200));
+    updateKnob(id, v);
+  }, {passive:false});
+});
+
+/* ========= MODES ========= */
+document.querySelectorAll('#modes .mode').forEach(m=>{
+  m.addEventListener('click', ()=>{
+    document.querySelectorAll('#modes .mode').forEach(x=>x.classList.remove('on'));
+    m.classList.add('on');
+    const map = { conservative: 22, balanced: 62, aggressive: 88, manual: 0 };
+    updateKnob('tolerance', map[m.dataset.mode] ?? 50);
+  });
+});
+
+/* ========= TWEAKS ========= */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "amber",
+  "density": 1,
+  "ticking": true
+}/*EDITMODE-END*/;
+
+function setAccent(v){
+  const map = {
+    amber: 'oklch(0.80 0.17 75)',
+    lime:  'oklch(0.86 0.18 130)',
+    cyan:  'oklch(0.80 0.14 210)'
+  };
+  document.documentElement.style.setProperty('--amber', map[v]);
+  persist({accent:v});
+}
+function setDensity(v){
+  document.documentElement.style.fontSize = (11 + (+v))+'px';
+  persist({density:+v});
+}
+let tickTimer = null;
+function setTicking(on){
+  if(on && !tickTimer){
+    tickTimer = setInterval(()=>{
+      // small jitters on ticker values
+      document.querySelectorAll('.ticker .v .delta').forEach(el=>{
+        const neg = el.classList.contains('neg');
+        const n = (Math.random()*4 - 1.5).toFixed(1);
+        el.textContent = (n>=0?'+':'')+n+'%';
+      });
+    }, 1800);
+  } else if(!on && tickTimer){
+    clearInterval(tickTimer); tickTimer=null;
+  }
+  document.getElementById('tkOn').classList.toggle('on', on);
+  document.getElementById('tkOff').classList.toggle('on', !on);
+  persist({ticking:on});
+}
+setTicking(true);
+
+function persist(edits){
+  try{ window.parent.postMessage({type:'__edit_mode_set_keys', edits}, '*'); }catch(_){}
+}
+
+function toggleTweaks(on){ document.getElementById('tweaksPanel').classList.toggle('open', on); }
+
+window.addEventListener('message', e=>{
+  const t = e.data && e.data.type;
+  if(t === '__activate_edit_mode') toggleTweaks(true);
+  if(t === '__deactivate_edit_mode') toggleTweaks(false);
+});
+window.parent.postMessage({type:'__edit_mode_available'}, '*');
+
+/* Label for screen comments */
+document.getElementById('app').setAttribute('data-screen-label','01 Orchestrator');
+</script>
+
+</body>
+</html>

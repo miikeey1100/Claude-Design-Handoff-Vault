@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Luxar Vault — AI Crypto Wallet</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: oklch(0.09 0.04 260); min-height: 100vh; }
+  body { font-family: 'Space Grotesk', system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes blink { to { opacity: 0; } }
+  ::selection { background: oklch(0.75 0.2 290 / 0.4); }
+  input[type=range] { accent-color: oklch(0.78 0.2 290); }
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+
+/* ==== components/Atoms.jsx ==== */
+// Atoms.jsx — shared holographic primitives
+// ------------------------------------------------------------
+
+const GlassPanel = ({ children, style = {}, tilt = false, blur = 28, intensity = 1, ...rest }) => {
+  const ref = React.useRef(null);
+  const [tilts, setTilts] = React.useState({ rx: 0, ry: 0, mx: 50, my: 50 });
+
+  const onMove = (e) => {
+    if (!tilt) return;
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    setTilts({
+      rx: (0.5 - y) * 4,
+      ry: (x - 0.5) * 4,
+      mx: x * 100,
+      my: y * 100,
+    });
+  };
+  const onLeave = () => setTilts({ rx: 0, ry: 0, mx: 50, my: 50 });
+
+  return (
+    <div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{
+        position: 'relative',
+        borderRadius: 22,
+        background: `
+          radial-gradient(120% 120% at ${tilts.mx}% ${tilts.my}%, rgba(255,255,255,${0.10 * intensity}) 0%, rgba(255,255,255,0) 45%),
+          linear-gradient(145deg, rgba(255,255,255,${0.09 * intensity}) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,${0.05 * intensity}) 100%)
+        `,
+        backdropFilter: `blur(${blur}px) saturate(1.6)`,
+        WebkitBackdropFilter: `blur(${blur}px) saturate(1.6)`,
+        border: '1px solid rgba(255,255,255,0.14)',
+        boxShadow: `
+          0 1px 0 0 rgba(255,255,255,0.22) inset,
+          0 -1px 0 0 rgba(255,255,255,0.05) inset,
+          0 30px 60px -20px rgba(0,0,0,0.55),
+          0 10px 30px -12px rgba(120, 80, 255, 0.25)
+        `,
+        transform: `perspective(1200px) rotateX(${tilts.rx}deg) rotateY(${tilts.ry}deg)`,
+        transition: 'transform 320ms cubic-bezier(.2,.8,.2,1)',
+        ...style,
+      }}
+      {...rest}
+    >
+      {/* top specular highlight */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.18), transparent 25%)',
+        mixBlendMode: 'overlay', opacity: 0.7,
+      }} />
+      {/* holographic chromatic edge */}
+      <div style={{
+        position: 'absolute', inset: -1, borderRadius: 'inherit', pointerEvents: 'none',
+        padding: 1,
+        background: 'conic-gradient(from 140deg at 50% 50%, rgba(120,220,255,0.55), rgba(200,120,255,0.45), rgba(255,120,200,0.4), rgba(120,255,220,0.45), rgba(120,220,255,0.55))',
+        WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+        WebkitMaskComposite: 'xor',
+        maskComposite: 'exclude',
+        opacity: 0.35,
+      }} />
+      {children}
+    </div>
+  );
+};
+
+// Iridescent button — press and hover states, optional shimmer
+const HoloButton = ({ children, variant = 'primary', onClick, style = {}, icon, full = false }) => {
+  const [hover, setHover] = React.useState(false);
+  const [press, setPress] = React.useState(false);
+
+  const bg = {
+    primary: `linear-gradient(135deg,
+      oklch(0.72 0.18 220) 0%,
+      oklch(0.70 0.22 300) 45%,
+      oklch(0.75 0.20 340) 100%)`,
+    ghost: 'rgba(255,255,255,0.06)',
+    risk: `linear-gradient(135deg,
+      var(--risk-a) 0%, var(--risk-b) 100%)`,
+  }[variant];
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setPress(false); }}
+      onMouseDown={() => setPress(true)}
+      onMouseUp={() => setPress(false)}
+      style={{
+        position: 'relative',
+        width: full ? '100%' : 'auto',
+        padding: '14px 22px',
+        borderRadius: 16,
+        border: '1px solid rgba(255,255,255,0.18)',
+        background: bg,
+        color: variant === 'ghost' ? 'rgba(255,255,255,0.9)' : '#0b0620',
+        fontFamily: 'Space Grotesk, sans-serif',
+        fontSize: 15,
+        fontWeight: 600,
+        letterSpacing: 0.2,
+        cursor: 'pointer',
+        overflow: 'hidden',
+        transform: press ? 'translateY(1px) scale(0.985)' : hover ? 'translateY(-1px)' : 'translateY(0)',
+        boxShadow: press
+          ? '0 4px 12px -4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.3) inset'
+          : hover
+            ? '0 16px 40px -10px rgba(180,120,255,0.55), 0 1px 0 rgba(255,255,255,0.4) inset'
+            : '0 8px 24px -8px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.3) inset',
+        transition: 'transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 240ms',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        ...style,
+      }}
+    >
+      {/* shimmer sweep on hover */}
+      <span style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)',
+        transform: `translateX(${hover ? '120%' : '-120%'})`,
+        transition: 'transform 900ms cubic-bezier(.2,.8,.2,1)',
+        pointerEvents: 'none',
+      }} />
+      {icon && <span style={{ display: 'inline-flex' }}>{icon}</span>}
+      <span style={{ position: 'relative' }}>{children}</span>
+    </button>
+  );
+};
+
+// Thin icon helpers — stroke-only, 18px
+const Icon = {
+  search: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>,
+  swap: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 4v14m0 0-3-3m3 3 3-3M17 20V6m0 0-3 3m3-3 3 3"/></svg>,
+  send: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg>,
+  receive: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14m0 0-6-6m6 6 6-6"/></svg>,
+  sparkle: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M5.6 5.6l2.8 2.8m7.2 7.2 2.8 2.8M5.6 18.4l2.8-2.8m7.2-7.2 2.8-2.8"/></svg>,
+  shield: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3 4 6v6c0 5 3.4 8.5 8 9 4.6-.5 8-4 8-9V6z"/></svg>,
+  bolt: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg>,
+  eye: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>,
+  close: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 6 12 12M18 6 6 18"/></svg>,
+  arrow: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 12h14m0 0-5-5m5 5-5 5"/></svg>,
+  chip: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m15-6h3m-3 6h3"/></svg>,
+};
+
+// Asset glyphs — pure CSS gradient circles (original, not branded)
+const AssetGlyph = ({ symbol, hue, size = 42 }) => (
+  <div style={{
+    width: size, height: size, borderRadius: '50%',
+    background: `radial-gradient(circle at 30% 25%, rgba(255,255,255,0.55), transparent 45%),
+                 conic-gradient(from 120deg, oklch(0.72 0.22 ${hue}), oklch(0.65 0.22 ${hue + 60}), oklch(0.78 0.18 ${hue - 30}), oklch(0.72 0.22 ${hue}))`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'rgba(255,255,255,0.95)',
+    fontFamily: 'Space Grotesk, sans-serif',
+    fontWeight: 700, fontSize: size * 0.34,
+    letterSpacing: -0.3,
+    boxShadow: '0 6px 18px -4px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.35) inset',
+    flexShrink: 0,
+  }}>
+    {symbol}
+  </div>
+);
+
+// Mini sparkline
+const Sparkline = ({ data, stroke = 'rgba(255,255,255,0.7)', w = 88, h = 28 }) => {
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg width={w} height={h} style={{ display: 'block' }}>
+      <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+};
+
+Object.assign(window, { GlassPanel, HoloButton, Icon, AssetGlyph, Sparkline });
+
+/* ==== components/Data.jsx ==== */
+// Data.jsx — fictional assets, not real brands
+// Symbols are short invented tickers.
+
+const ASSETS = [
+  { sym: 'LUX',  name: 'Luxar',       hue: 250, balance: 12.482, price: 3421.90, change: +2.14, spark: [40,42,41,44,46,45,48,51,49,52,55,58], alloc: 38, risk: 0.22 },
+  { sym: 'ORB',  name: 'Orbital',     hue: 190, balance: 0.8214, price: 58210.12, change: +0.46, spark: [60,62,61,63,62,65,64,66,68,67,70,72], alloc: 24, risk: 0.18 },
+  { sym: 'NOVA', name: 'Nova Stable', hue: 140, balance: 18240.00, price: 1.0002, change: +0.01, spark: [50,50,50,51,50,50,51,50,50,50,50,50], alloc: 14, risk: 0.05 },
+  { sym: 'ZEN',  name: 'Zenith',      hue: 310, balance: 412.55,  price: 184.21, change: -1.82, spark: [70,68,72,69,66,64,62,60,61,59,58,56], alloc: 11, risk: 0.44 },
+  { sym: 'HLX',  name: 'Helix Proto', hue: 40,  balance: 88.12,   price: 92.43,  change: +6.71, spark: [30,35,34,38,42,45,48,52,55,58,62,66], alloc: 8,  risk: 0.72 },
+  { sym: 'VRT',  name: 'Vertex AI',   hue: 350, balance: 1240.00, price: 4.218,  change: +12.04, spark: [20,22,24,28,30,34,40,46,52,58,64,70], alloc: 5,  risk: 0.88 },
+];
+
+const ACTIVITY = [
+  { t: 'Swap',     from: 'NOVA',  to: 'LUX',   amt: '240.00',  when: '2m',  tag: 'executed' },
+  { t: 'Receive',  from: '0x7a…2f', to: 'LUX', amt: '0.482',   when: '18m', tag: 'confirmed' },
+  { t: 'Approve',  from: 'VRT',   to: 'Vault',  amt: '—',       when: '1h',  tag: 'flagged' },
+  { t: 'Send',     from: 'ORB',   to: '0x91…c4', amt: '0.012',  when: '3h',  tag: 'executed' },
+];
+
+const AI_INSIGHTS = [
+  { icon: 'bolt',   title: 'Rebalance suggested',   body: 'VRT is 18% over target. Trim 220 VRT → NOVA for a 4.3% risk drop.', tone: 'warn' },
+  { icon: 'shield', title: 'Contract approved',     body: 'Helix Pool v3 audited 11d ago. Medium trust — monitor for 30d.',    tone: 'ok' },
+  { icon: 'sparkle', title: 'Gas window opens',     body: 'Network fees forecast to drop 42% between 18:40–19:20 UTC.',        tone: 'info' },
+];
+
+Object.assign(window, { ASSETS, ACTIVITY, AI_INSIGHTS });
+
+/* ==== components/Panels.jsx ==== */
+// Panels.jsx — main UI panels
+// ------------------------------------------------------------
+
+// ---- Risk Slider ----------------------------------------------------------
+const RiskSlider = ({ value, onChange }) => {
+  // value 0..1 → green to amber to red
+  const hue = React.useMemo(() => {
+    // 150 (green) → 65 (amber) → 25 (red)
+    if (value < 0.5) return 150 - (value / 0.5) * 85;    // 150→65
+    return 65 - ((value - 0.5) / 0.5) * 40;              // 65→25
+  }, [value]);
+
+  const chroma = 0.17 + value * 0.06;
+  const label = value < 0.33 ? 'Conservative' : value < 0.66 ? 'Balanced' : value < 0.88 ? 'Aggressive' : 'Degen';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: 'JetBrains Mono, monospace' }}>
+            Exposure · live
+          </div>
+          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 28, fontWeight: 600, color: '#fff', marginTop: 4, letterSpacing: -0.5 }}>
+            {label}
+            <span style={{ marginLeft: 10, fontSize: 15, color: `oklch(0.78 ${chroma} ${hue})`, fontFamily: 'JetBrains Mono, monospace' }}>
+              {(value * 100).toFixed(0)}%
+            </span>
+          </div>
+        </div>
+        <div style={{
+          padding: '6px 10px', borderRadius: 999,
+          background: `oklch(0.78 ${chroma} ${hue} / 0.15)`,
+          border: `1px solid oklch(0.78 ${chroma} ${hue} / 0.5)`,
+          color: `oklch(0.92 ${chroma * 0.6} ${hue})`,
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1,
+        }}>
+          VAR 24h · ${(1240 + value * 18600).toFixed(0)}
+        </div>
+      </div>
+
+      {/* Slider track */}
+      <div style={{ position: 'relative', height: 56, padding: '20px 0' }}>
+        <div style={{
+          position: 'absolute', left: 0, right: 0, top: 24, height: 8, borderRadius: 999,
+          background: 'linear-gradient(90deg, oklch(0.78 0.17 150), oklch(0.80 0.20 100), oklch(0.78 0.18 65), oklch(0.66 0.22 25))',
+          opacity: 0.35,
+        }} />
+        <div style={{
+          position: 'absolute', left: 0, top: 24, height: 8, borderRadius: 999,
+          width: `${value * 100}%`,
+          background: `linear-gradient(90deg, oklch(0.78 0.17 150), oklch(0.78 ${chroma} ${hue}))`,
+          boxShadow: `0 0 24px oklch(0.78 ${chroma} ${hue} / 0.6)`,
+        }} />
+        {/* tick marks */}
+        {[0, 0.25, 0.5, 0.75, 1].map(t => (
+          <div key={t} style={{
+            position: 'absolute', top: 22, left: `${t * 100}%`,
+            width: 1, height: 12, background: 'rgba(255,255,255,0.25)', transform: 'translateX(-0.5px)',
+          }}/>
+        ))}
+        {/* thumb */}
+        <div style={{
+          position: 'absolute', top: 12, left: `${value * 100}%`, transform: 'translate(-50%, 0)',
+          width: 32, height: 32, borderRadius: '50%', pointerEvents: 'none',
+          background: `radial-gradient(circle at 30% 25%, rgba(255,255,255,0.8), transparent 50%),
+                       conic-gradient(from 0deg, oklch(0.78 ${chroma} ${hue}), oklch(0.85 ${chroma} ${hue + 30}), oklch(0.78 ${chroma} ${hue}))`,
+          border: '1px solid rgba(255,255,255,0.7)',
+          boxShadow: `0 8px 24px -4px oklch(0.78 ${chroma} ${hue} / 0.7), 0 1px 0 rgba(255,255,255,0.6) inset`,
+        }}/>
+        <input
+          type="range" min="0" max="1" step="0.001" value={value}
+          onChange={e => onChange(parseFloat(e.target.value))}
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            opacity: 0, cursor: 'pointer',
+          }}
+        />
+      </div>
+
+      {/* labels */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)', marginTop: -4 }}>
+        <span>SAFE</span><span>LOW</span><span>MEDIUM</span><span>HIGH</span><span>DEGEN</span>
+      </div>
+
+      {/* exposure breakdown */}
+      <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        {[
+          { k: 'Stables', v: `${Math.max(5, 60 - value * 50).toFixed(0)}%` },
+          { k: 'Blue-chip', v: `${(30 + value * 10).toFixed(0)}%` },
+          { k: 'Long-tail', v: `${(10 + value * 40).toFixed(0)}%` },
+        ].map(s => (
+          <div key={s.k} style={{
+            padding: '10px 12px', borderRadius: 12,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <div style={{ fontSize: 10, letterSpacing: 1.4, color: 'rgba(255,255,255,0.5)', fontFamily: 'JetBrains Mono, monospace' }}>{s.k.toUpperCase()}</div>
+            <div style={{ fontSize: 18, color: '#fff', fontFamily: 'Space Grotesk, sans-serif', marginTop: 2, fontWeight: 500 }}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ---- Portfolio header -----------------------------------------------------
+const PortfolioHeader = ({ total, delta, hidden, setHidden }) => {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '4px 4px 20px' }}>
+      <div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 2, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase' }}>
+          Total balance · USD
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 6 }}>
+          <div style={{
+            fontFamily: 'Space Grotesk, sans-serif', fontSize: 62, fontWeight: 500, color: '#fff',
+            letterSpacing: -2, lineHeight: 1,
+            filter: hidden ? 'blur(14px)' : 'none', transition: 'filter 300ms',
+          }}>
+            ${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </div>
+          <div style={{
+            padding: '5px 10px', borderRadius: 10,
+            background: delta >= 0 ? 'oklch(0.78 0.17 150 / 0.15)' : 'oklch(0.66 0.22 25 / 0.15)',
+            border: `1px solid ${delta >= 0 ? 'oklch(0.78 0.17 150 / 0.5)' : 'oklch(0.66 0.22 25 / 0.5)'}`,
+            color: delta >= 0 ? 'oklch(0.9 0.17 150)' : 'oklch(0.78 0.22 25)',
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 500,
+          }}>
+            {delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(2)}%  ·  24h
+          </div>
+        </div>
+        <div style={{ marginTop: 10, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+          0x7a4f…b921&nbsp;·&nbsp;<span style={{ color: 'oklch(0.85 0.15 180)' }}>● connected</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={() => setHidden(!hidden)} style={{
+          width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        }}>
+          {Icon.eye}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ---- Asset list with search ----------------------------------------------
+const AssetList = ({ query, setQuery }) => {
+  // fuzzy scoring — simple subsequence match with proximity bonus
+  const score = (needle, hay) => {
+    if (!needle) return 0;
+    needle = needle.toLowerCase(); hay = hay.toLowerCase();
+    let ni = 0, lastMatch = -1, s = 0;
+    for (let i = 0; i < hay.length && ni < needle.length; i++) {
+      if (hay[i] === needle[ni]) {
+        s += 10;
+        if (lastMatch >= 0 && i - lastMatch === 1) s += 6; // consecutive
+        if (i === 0) s += 4;
+        lastMatch = i; ni++;
+      }
+    }
+    return ni === needle.length ? s : -1;
+  };
+
+  const filtered = React.useMemo(() => {
+    if (!query) return ASSETS;
+    return ASSETS.map(a => ({
+      a,
+      s: Math.max(score(query, a.sym), score(query, a.name)),
+    })).filter(x => x.s > 0).sort((x, y) => y.s - x.s).map(x => x.a);
+  }, [query]);
+
+  const highlight = (text) => {
+    if (!query) return text;
+    const q = query.toLowerCase();
+    const out = [];
+    let qi = 0;
+    for (let i = 0; i < text.length; i++) {
+      const match = qi < q.length && text[i].toLowerCase() === q[qi];
+      out.push(
+        <span key={i} style={match ? {
+          color: '#fff', background: 'oklch(0.75 0.2 290 / 0.4)', padding: '0 1px', borderRadius: 3,
+        } : undefined}>
+          {text[i]}
+        </span>
+      );
+      if (match) qi++;
+    }
+    return out;
+  };
+
+  return (
+    <div>
+      {/* Search */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '14px 18px', borderRadius: 16,
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        marginBottom: 14,
+      }}>
+        <span style={{ color: 'rgba(255,255,255,0.6)' }}>{Icon.search}</span>
+        <input
+          value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="Fuzzy search assets, chains, pools…"
+          style={{
+            flex: 1, background: 'transparent', border: 'none', outline: 'none',
+            color: '#fff', fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, letterSpacing: 0.1,
+          }}
+        />
+        <span style={{
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'rgba(255,255,255,0.5)',
+          padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
+        }}>
+          ⌘ K
+        </span>
+      </div>
+
+      {/* Header row */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1.1fr 64px',
+        padding: '0 14px 8px', fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 10, letterSpacing: 1.6, color: 'rgba(255,255,255,0.4)',
+      }}>
+        <div>ASSET</div><div>HOLDINGS</div><div>PRICE · 24H</div><div>7-DAY</div><div style={{ textAlign: 'right' }}>RISK</div>
+      </div>
+
+      {/* Rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {filtered.map((a, i) => {
+          const riskHue = 150 - a.risk * 125;
+          return (
+            <div key={a.sym} style={{
+              display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1.1fr 64px',
+              alignItems: 'center', padding: '12px 14px', borderRadius: 14,
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 1px 0 rgba(255,255,255,0.08) inset',
+              transition: 'transform 220ms, background 220ms',
+              cursor: 'pointer',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04))'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))'; e.currentTarget.style.transform = 'translateY(0)'; }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <AssetGlyph symbol={a.sym[0]} hue={a.hue} size={38} />
+                <div>
+                  <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 500, color: '#fff', letterSpacing: 0.1 }}>
+                    {highlight(a.sym)}
+                  </div>
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                    {highlight(a.name)}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#fff' }}>
+                  {a.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                  ${(a.balance * a.price).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: '#fff' }}>
+                  ${a.price.toLocaleString(undefined, { maximumFractionDigits: a.price < 10 ? 3 : 2 })}
+                </div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, marginTop: 2,
+                  color: a.change >= 0 ? 'oklch(0.82 0.18 150)' : 'oklch(0.75 0.22 25)' }}>
+                  {a.change >= 0 ? '+' : ''}{a.change.toFixed(2)}%
+                </div>
+              </div>
+              <div>
+                <Sparkline data={a.spark} stroke={a.change >= 0 ? 'oklch(0.82 0.18 150)' : 'oklch(0.75 0.22 25)'} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <div style={{
+                  padding: '4px 8px', borderRadius: 999,
+                  background: `oklch(0.78 0.18 ${riskHue} / 0.15)`,
+                  border: `1px solid oklch(0.78 0.18 ${riskHue} / 0.5)`,
+                  color: `oklch(0.92 0.12 ${riskHue})`,
+                  fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 0.5,
+                }}>
+                  {(a.risk * 100).toFixed(0)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <div style={{
+            padding: 28, textAlign: 'center', color: 'rgba(255,255,255,0.45)',
+            fontFamily: 'Space Grotesk, sans-serif', fontSize: 13,
+            border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 14,
+          }}>
+            No matches for "<span style={{ color: '#fff' }}>{query}</span>"
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+Object.assign(window, { RiskSlider, PortfolioHeader, AssetList });
+
+/* ==== components/SwapAndInsights.jsx ==== */
+// SwapAndInsights.jsx — Smart Swap + AI Insights + Activity
+// ------------------------------------------------------------
+
+// ---- Smart Swap -----------------------------------------------------------
+const SmartSwap = ({ risk }) => {
+  const [from, setFrom] = React.useState('NOVA');
+  const [to, setTo] = React.useState('LUX');
+  const [amount, setAmount] = React.useState('240');
+  const [flipping, setFlipping] = React.useState(false);
+
+  const fromAsset = ASSETS.find(a => a.sym === from);
+  const toAsset = ASSETS.find(a => a.sym === to);
+  const rate = fromAsset.price / toAsset.price;
+  const received = (parseFloat(amount || 0) * rate);
+
+  // AI route score climbs with risk appetite
+  const routes = [
+    { name: 'Hyperloop v4',   save: '$12.40', mev: 'shielded', time: '~4s',  best: true },
+    { name: 'Nebula Splitter', save: '$9.80',  mev: 'shielded', time: '~7s',  best: false },
+    { name: 'Direct AMM',      save: '$0.00',  mev: 'exposed',  time: '~2s',  best: false },
+  ];
+
+  const flip = () => {
+    setFlipping(true);
+    setTimeout(() => {
+      setFrom(to); setTo(from);
+      setFlipping(false);
+    }, 240);
+  };
+
+  const TokenPicker = ({ value, onChange, label }) => {
+    const a = ASSETS.find(x => x.sym === value);
+    const [open, setOpen] = React.useState(false);
+    return (
+      <div style={{
+        padding: 16, borderRadius: 18,
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        position: 'relative',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.4, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+          <span>{label}</span>
+          <span>BAL {a.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => setOpen(!open)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px 8px 8px',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 999, color: '#fff', cursor: 'pointer',
+            fontFamily: 'Space Grotesk, sans-serif', fontWeight: 500, fontSize: 15,
+          }}>
+            <AssetGlyph symbol={a.sym[0]} hue={a.hue} size={28}/>
+            {a.sym}
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>▾</span>
+          </button>
+          {label === 'YOU PAY' ? (
+            <input
+              value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+              style={{
+                flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                color: '#fff', fontFamily: 'Space Grotesk, sans-serif',
+                fontSize: 32, fontWeight: 500, letterSpacing: -1, textAlign: 'right',
+              }}
+            />
+          ) : (
+            <div style={{
+              flex: 1, textAlign: 'right',
+              color: '#fff', fontFamily: 'Space Grotesk, sans-serif',
+              fontSize: 32, fontWeight: 500, letterSpacing: -1,
+            }}>
+              {received.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+          <span>${a.price.toLocaleString(undefined, { maximumFractionDigits: a.price < 10 ? 3 : 2 })}</span>
+          <span>≈ ${(label === 'YOU PAY' ? parseFloat(amount || 0) * a.price : received * a.price).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+        </div>
+
+        {open && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 8, zIndex: 20,
+            padding: 8, borderRadius: 14,
+            background: 'rgba(22,14,42,0.92)',
+            backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.6)',
+          }}>
+            {ASSETS.filter(x => x.sym !== value).map(x => (
+              <div key={x.sym} onClick={() => { onChange(x.sym); setOpen(false); }} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                borderRadius: 10, cursor: 'pointer', color: '#fff',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <AssetGlyph symbol={x.sym[0]} hue={x.hue} size={26}/>
+                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 14 }}>{x.sym}</div>
+                <div style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                  {x.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: 'conic-gradient(from 120deg, oklch(0.72 0.2 220), oklch(0.70 0.22 300), oklch(0.75 0.2 340), oklch(0.72 0.2 220))',
+            boxShadow: '0 6px 16px -4px rgba(180,120,255,0.5), 0 1px 0 rgba(255,255,255,0.4) inset',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0620',
+          }}>{Icon.sparkle}</div>
+          <div>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 500, color: '#fff' }}>Smart Swap</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.4, color: 'rgba(255,255,255,0.5)' }}>AI-ROUTED · MEV-SHIELDED</div>
+          </div>
+        </div>
+        <div style={{
+          padding: '5px 10px', borderRadius: 999,
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1, color: 'rgba(255,255,255,0.7)',
+        }}>
+          SLIP 0.3%
+        </div>
+      </div>
+
+      {/* I/O */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ transform: flipping ? 'translateY(10px)' : 'translateY(0)', opacity: flipping ? 0.5 : 1, transition: 'all 240ms' }}>
+          <TokenPicker value={from} onChange={setFrom} label="YOU PAY" />
+        </div>
+
+        {/* flip handle */}
+        <button onClick={flip} style={{
+          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+          width: 44, height: 44, borderRadius: 14, cursor: 'pointer',
+          background: 'linear-gradient(135deg, oklch(0.28 0.06 280), oklch(0.22 0.06 280))',
+          border: '1px solid rgba(255,255,255,0.2)',
+          boxShadow: '0 8px 20px -6px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.3) inset',
+          color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 5,
+          transition: 'transform 240ms cubic-bezier(.2,.8,.2,1)',
+        }}
+          onMouseDown={e => e.currentTarget.style.transform = 'translate(-50%, -50%) rotate(180deg) scale(0.9)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'translate(-50%, -50%)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'translate(-50%, -50%)'}
+        >
+          {Icon.swap}
+        </button>
+
+        <div style={{ transform: flipping ? 'translateY(-10px)' : 'translateY(0)', opacity: flipping ? 0.5 : 1, transition: 'all 240ms' }}>
+          <TokenPicker value={to} onChange={setTo} label="YOU RECEIVE" />
+        </div>
+      </div>
+
+      {/* Rate line */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+        <span>1 {from} = {rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {to}</span>
+        <span>network: Hyperloop · gas ~$0.08</span>
+      </div>
+
+      {/* Routes */}
+      <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.4, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>AI-SUGGESTED ROUTES</div>
+        {routes.map((r, i) => (
+          <div key={r.name} style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+            borderRadius: 12,
+            background: r.best ? 'linear-gradient(90deg, oklch(0.72 0.18 220 / 0.18), oklch(0.72 0.2 310 / 0.1))' : 'rgba(255,255,255,0.03)',
+            border: r.best ? '1px solid oklch(0.75 0.18 260 / 0.5)' : '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: r.best ? 'oklch(0.82 0.2 160)' : 'rgba(255,255,255,0.3)' }}/>
+            <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, color: '#fff', fontWeight: r.best ? 500 : 400 }}>{r.name}</div>
+            {r.best && <div style={{ padding: '2px 7px', borderRadius: 999, background: 'oklch(0.82 0.2 160 / 0.15)', border: '1px solid oklch(0.82 0.2 160 / 0.5)', color: 'oklch(0.92 0.15 160)', fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1 }}>BEST</div>}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 14, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>
+              <span>saves {r.save}</span>
+              <span>{r.time}</span>
+              <span style={{ color: r.mev === 'shielded' ? 'oklch(0.85 0.15 160)' : 'oklch(0.78 0.2 40)' }}>{r.mev}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA row */}
+      <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+        <HoloButton variant="primary" full icon={Icon.bolt}>
+          Smart Swap · confirm
+        </HoloButton>
+        <HoloButton variant="ghost">
+          Simulate
+        </HoloButton>
+      </div>
+    </div>
+  );
+};
+
+// ---- AI Insights ----------------------------------------------------------
+const AIInsights = () => {
+  const [typed, setTyped] = React.useState('');
+  const full = 'Your exposure is 12% above your stated target. Consider trimming VRT.';
+  React.useEffect(() => {
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setTyped(full.slice(0, i));
+      if (i >= full.length) clearInterval(id);
+    }, 22);
+    return () => clearInterval(id);
+  }, []);
+
+  const toneStyle = (tone) => ({
+    ok:   { bg: 'oklch(0.82 0.18 160 / 0.12)', bd: 'oklch(0.82 0.18 160 / 0.35)', fg: 'oklch(0.9 0.15 160)' },
+    warn: { bg: 'oklch(0.78 0.18 65 / 0.12)',  bd: 'oklch(0.78 0.18 65 / 0.4)',   fg: 'oklch(0.9 0.15 80)' },
+    info: { bg: 'oklch(0.72 0.18 260 / 0.12)', bd: 'oklch(0.72 0.18 260 / 0.4)',  fg: 'oklch(0.9 0.15 260)' },
+  })[tone];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8,
+          background: 'conic-gradient(from 0deg, oklch(0.75 0.2 180), oklch(0.72 0.22 300), oklch(0.78 0.18 60), oklch(0.75 0.2 180))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0620',
+          boxShadow: '0 6px 16px -4px rgba(120,200,255,0.4), 0 1px 0 rgba(255,255,255,0.4) inset',
+          animation: 'spin 14s linear infinite',
+        }}>{Icon.sparkle}</div>
+        <div>
+          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 500, color: '#fff' }}>Oracle</div>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.4, color: 'rgba(255,255,255,0.5)' }}>PORTFOLIO AI · UPDATED 12s AGO</div>
+        </div>
+      </div>
+
+      {/* Typewriter summary */}
+      <div style={{
+        padding: 14, borderRadius: 14, marginBottom: 14,
+        background: 'linear-gradient(135deg, oklch(0.72 0.18 260 / 0.14), oklch(0.72 0.2 310 / 0.08))',
+        border: '1px solid oklch(0.72 0.18 260 / 0.4)',
+        color: '#fff',
+        fontFamily: 'Space Grotesk, sans-serif', fontSize: 14, lineHeight: 1.55,
+        minHeight: 66,
+      }}>
+        {typed}
+        <span style={{ display: 'inline-block', width: 8, height: 14, background: 'oklch(0.9 0.15 260)', marginLeft: 3, verticalAlign: -2, animation: 'blink 1s steps(2) infinite' }}/>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {AI_INSIGHTS.map((ins, i) => {
+          const t = toneStyle(ins.tone);
+          return (
+            <div key={i} style={{
+              display: 'flex', gap: 12, padding: 12, borderRadius: 12,
+              background: t.bg, border: `1px solid ${t.bd}`,
+            }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: t.fg,
+              }}>{Icon[ins.icon]}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, color: '#fff', fontWeight: 500 }}>{ins.title}</div>
+                <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 3, lineHeight: 1.45 }}>{ins.body}</div>
+              </div>
+              <button style={{
+                alignSelf: 'center', padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                color: '#fff', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1, cursor: 'pointer',
+              }}>APPLY</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ---- Activity feed --------------------------------------------------------
+const ActivityFeed = () => (
+  <div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 16, fontWeight: 500, color: '#fff' }}>Recent activity</div>
+      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>view all →</div>
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {ACTIVITY.map((a, i) => {
+        const tagColor = {
+          executed:  'oklch(0.82 0.18 160)',
+          confirmed: 'oklch(0.8 0.15 220)',
+          flagged:   'oklch(0.78 0.2 40)',
+        }[a.tag];
+        return (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: '90px 1fr auto auto',
+            alignItems: 'center', padding: '10px 4px',
+            borderBottom: i < ACTIVITY.length - 1 ? '1px dashed rgba(255,255,255,0.08)' : 'none',
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'rgba(255,255,255,0.85)',
+          }}>
+            <div style={{ color: '#fff', fontFamily: 'Space Grotesk, sans-serif', fontSize: 13 }}>{a.t}</div>
+            <div style={{ color: 'rgba(255,255,255,0.65)' }}>{a.from} → {a.to}</div>
+            <div style={{ color: '#fff', marginRight: 14 }}>{a.amt}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: tagColor, fontSize: 10, letterSpacing: 1 }}>● {a.tag}</span>
+              <span style={{ color: 'rgba(255,255,255,0.5)', width: 32, textAlign: 'right' }}>{a.when}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+Object.assign(window, { SmartSwap, AIInsights, ActivityFeed });
+
+/* ==== components/App.jsx ==== */
+// App.jsx — main wallet shell
+// ------------------------------------------------------------
+
+function WalletShell() {
+  const [risk, setRisk] = React.useState(() => {
+    const v = parseFloat(localStorage.getItem('lux_risk') || '0.34');
+    return isNaN(v) ? 0.34 : v;
+  });
+  const [query, setQuery] = React.useState('');
+  const [hidden, setHidden] = React.useState(false);
+
+  React.useEffect(() => { localStorage.setItem('lux_risk', String(risk)); }, [risk]);
+
+  // Global risk-driven colors — exposed as CSS vars
+  const hue = risk < 0.5 ? 150 - (risk / 0.5) * 85 : 65 - ((risk - 0.5) / 0.5) * 40;
+  const chroma = 0.17 + risk * 0.06;
+  const riskA = `oklch(0.78 ${chroma} ${hue})`;
+  const riskB = `oklch(0.65 ${chroma + 0.03} ${hue - 20})`;
+
+  const total = ASSETS.reduce((s, a) => s + a.balance * a.price, 0);
+
+  return (
+    <div
+      style={{
+        '--risk-a': riskA,
+        '--risk-b': riskB,
+        position: 'relative',
+        minHeight: '100vh',
+        padding: '28px 36px 56px',
+        color: '#fff',
+        fontFamily: 'Space Grotesk, sans-serif',
+        overflow: 'hidden',
+        isolation: 'isolate',
+      }}
+    >
+      {/* Cosmos background */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: -2,
+        background: 'radial-gradient(130% 100% at 70% -10%, oklch(0.28 0.12 300) 0%, oklch(0.14 0.06 270) 40%, oklch(0.09 0.04 260) 100%)',
+      }}/>
+      {/* Aurora blobs */}
+      <div style={{
+        position: 'fixed', width: 720, height: 720, borderRadius: '50%',
+        top: -180, left: -140, zIndex: -1, pointerEvents: 'none',
+        background: `radial-gradient(circle, ${riskA}aa 0%, transparent 60%)`,
+        filter: 'blur(90px)', opacity: 0.45,
+        transition: 'background 400ms',
+      }}/>
+      <div style={{
+        position: 'fixed', width: 640, height: 640, borderRadius: '50%',
+        bottom: -160, right: -120, zIndex: -1, pointerEvents: 'none',
+        background: 'radial-gradient(circle, oklch(0.6 0.22 310 / 0.7) 0%, transparent 60%)',
+        filter: 'blur(90px)', opacity: 0.6,
+      }}/>
+      <div style={{
+        position: 'fixed', width: 520, height: 520, borderRadius: '50%',
+        top: '45%', left: '42%', zIndex: -1, pointerEvents: 'none',
+        background: 'radial-gradient(circle, oklch(0.6 0.22 220 / 0.5) 0%, transparent 60%)',
+        filter: 'blur(100px)', opacity: 0.5,
+      }}/>
+      {/* star dust */}
+      <svg style={{ position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none', opacity: 0.5 }}>
+        {Array.from({ length: 60 }).map((_, i) => {
+          const x = (i * 97 + 13) % 100;
+          const y = (i * 53 + 29) % 100;
+          const r = 0.5 + ((i * 17) % 10) / 10;
+          return <circle key={i} cx={`${x}%`} cy={`${y}%`} r={r} fill="white" opacity={0.35 + (i % 5) * 0.1}/>;
+        })}
+      </svg>
+
+      {/* Top nav */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 28, maxWidth: 1440, margin: '0 auto 28px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 11,
+            background: 'conic-gradient(from 120deg, oklch(0.72 0.2 220), oklch(0.72 0.22 300), oklch(0.78 0.18 340), oklch(0.72 0.2 220))',
+            boxShadow: '0 8px 20px -4px rgba(180,120,255,0.5), 0 1px 0 rgba(255,255,255,0.45) inset',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{ width: 16, height: 16, borderRadius: 5, background: 'rgba(11,6,32,0.6)', backdropFilter: 'blur(4px)' }}/>
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.3 }}>Luxar Vault</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.4, color: 'rgba(255,255,255,0.5)' }}>AI-NATIVE WALLET · v4.2</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Space Grotesk, sans-serif' }}>
+          {['Portfolio', 'Swap', 'Stake', 'History'].map((t, i) => (
+            <div key={t} style={{
+              padding: '8px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 13,
+              color: i === 0 ? '#fff' : 'rgba(255,255,255,0.55)',
+              background: i === 0 ? 'rgba(255,255,255,0.08)' : 'transparent',
+              border: i === 0 ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent',
+            }}>
+              {t}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            padding: '7px 12px', borderRadius: 999,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'rgba(255,255,255,0.85)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'oklch(0.8 0.18 160)', boxShadow: '0 0 10px oklch(0.8 0.18 160)'}}/>
+            Hyperloop
+          </div>
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'conic-gradient(from 45deg, oklch(0.7 0.2 300), oklch(0.75 0.18 200), oklch(0.7 0.2 340))',
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}/>
+        </div>
+      </div>
+
+      {/* GRID */}
+      <div style={{
+        maxWidth: 1440, margin: '0 auto',
+        display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 24,
+      }}>
+        {/* LEFT COLUMN */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Hero: portfolio + risk */}
+          <GlassPanel tilt style={{ padding: 28 }}>
+            <PortfolioHeader total={total} delta={+3.48} hidden={hidden} setHidden={setHidden}/>
+
+            <div style={{
+              height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)', margin: '6px 0 20px',
+            }}/>
+
+            <RiskSlider value={risk} onChange={setRisk}/>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+              <HoloButton variant="risk" icon={Icon.bolt}>Auto-rebalance</HoloButton>
+              <HoloButton variant="ghost" icon={Icon.send}>Send</HoloButton>
+              <HoloButton variant="ghost" icon={Icon.receive}>Receive</HoloButton>
+              <div style={{ flex: 1 }}/>
+              <HoloButton variant="ghost" icon={Icon.chip}>Connect Ledger</HoloButton>
+            </div>
+          </GlassPanel>
+
+          {/* Asset list */}
+          <GlassPanel style={{ padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, fontWeight: 500 }}>Assets</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['All', 'Holdings', 'Watch', 'Staked'].map((t, i) => (
+                  <div key={t} style={{
+                    padding: '4px 10px', borderRadius: 999, fontSize: 11, letterSpacing: 0.5,
+                    fontFamily: 'JetBrains Mono, monospace', cursor: 'pointer',
+                    background: i === 1 ? 'rgba(255,255,255,0.10)' : 'transparent',
+                    border: `1px solid ${i === 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)'}`,
+                    color: i === 1 ? '#fff' : 'rgba(255,255,255,0.6)',
+                  }}>{t.toUpperCase()}</div>
+                ))}
+              </div>
+            </div>
+            <AssetList query={query} setQuery={setQuery}/>
+          </GlassPanel>
+
+          {/* Activity */}
+          <GlassPanel style={{ padding: 22 }}>
+            <ActivityFeed/>
+          </GlassPanel>
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <GlassPanel style={{ padding: 22 }}>
+            <SmartSwap risk={risk}/>
+          </GlassPanel>
+
+          <GlassPanel style={{ padding: 22 }}>
+            <AIInsights/>
+          </GlassPanel>
+        </div>
+      </div>
+
+      <TweaksPanel risk={risk} setRisk={setRisk}/>
+    </div>
+  );
+}
+
+// ---- Tweaks panel ---------------------------------------------------------
+function TweaksPanel({ risk, setRisk }) {
+  const [on, setOn] = React.useState(false);
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setOn(true);
+      if (e.data?.type === '__deactivate_edit_mode') setOn(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  if (!on) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 50,
+      width: 260, padding: 16, borderRadius: 16,
+      background: 'rgba(22,14,42,0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255,255,255,0.16)',
+      boxShadow: '0 30px 60px -10px rgba(0,0,0,0.7)',
+      color: '#fff', fontFamily: 'Space Grotesk, sans-serif',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, letterSpacing: 0.3 }}>Tweaks</div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>LIVE</div>
+      </div>
+      <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: 'rgba(255,255,255,0.6)', marginBottom: 6, letterSpacing: 1.2 }}>
+        RISK EXPOSURE · {(risk * 100).toFixed(0)}%
+      </div>
+      <input type="range" min="0" max="1" step="0.01" value={risk}
+        onChange={e => setRisk(parseFloat(e.target.value))}
+        style={{ width: '100%' }}/>
+      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {[
+          { k: 'SAFE', v: 0.1 }, { k: 'BALANCED', v: 0.45 },
+          { k: 'AGGRO', v: 0.75 }, { k: 'DEGEN', v: 0.98 },
+        ].map(p => (
+          <button key={p.k} onClick={() => setRisk(p.v)} style={{
+            padding: '6px 8px', borderRadius: 8,
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+            color: '#fff', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1, cursor: 'pointer',
+          }}>{p.k}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<WalletShell/>);
+
+</script>
+</body>
+</html>

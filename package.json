@@ -1,0 +1,13 @@
+{
+  "name": "claude-design-handoff-vault",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node scripts/capture.mjs",
+    "setup": "npm install && npx playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright-chromium": "^1.48.0"
+  }
+}

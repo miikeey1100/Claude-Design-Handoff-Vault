@@ -1,0 +1,129 @@
+/* AeroDrop — Obsidian Liquid Glass Design Tokens */
+:root {
+  /* Obsidian foundation */
+  --obsidian-900: oklch(0.09 0.015 285);
+  --obsidian-800: oklch(0.12 0.02 285);
+  --obsidian-700: oklch(0.16 0.025 288);
+  --obsidian-600: oklch(0.22 0.03 290);
+
+  /* Neon violet accent */
+  --violet-400: oklch(0.78 0.22 305);
+  --violet-500: oklch(0.72 0.28 305);
+  --violet-600: oklch(0.62 0.29 305);
+  --violet-glow: oklch(0.72 0.28 305 / 0.5);
+
+  /* Secondary accent — cool cyan for telemetry only */
+  --cyan-400: oklch(0.85 0.14 220);
+
+  /* Text */
+  --text-primary: oklch(0.98 0.005 285);
+  --text-secondary: oklch(0.72 0.015 285);
+  --text-tertiary: oklch(0.52 0.015 285);
+
+  /* Glass layers */
+  --glass-1: oklch(1 0 0 / 0.04);
+  --glass-2: oklch(1 0 0 / 0.07);
+  --glass-3: oklch(1 0 0 / 0.10);
+  --glass-hi: oklch(1 0 0 / 0.18);
+  --glass-border: oklch(1 0 0 / 0.12);
+  --glass-border-soft: oklch(1 0 0 / 0.06);
+
+  /* Spacing — 4pt grid (HIG) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+
+  /* Radii */
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-2xl: 34px;
+
+  /* Type */
+  --font-sans: -apple-system, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+
+/* Global keyframes */
+@keyframes ad-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.15); }
+}
+@keyframes ad-pulse-ring {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes ad-scan {
+  0% { transform: translateY(-100%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(200%); opacity: 0; }
+}
+@keyframes ad-dash {
+  to { stroke-dashoffset: -40; }
+}
+@keyframes ad-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(6px, -4px); }
+}
+@keyframes ad-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes ad-glow-breath {
+  0%, 100% { filter: blur(32px) brightness(1); opacity: 0.5; }
+  50% { filter: blur(40px) brightness(1.3); opacity: 0.75; }
+}
+@keyframes ad-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ad-drone-hover {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-3px); }
+}
+
+/* Utility classes */
+.ad-glass {
+  position: relative;
+  background: var(--glass-2);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 0.5px solid var(--glass-border);
+  box-shadow:
+    inset 0 0.5px 0 oklch(1 0 0 / 0.18),
+    inset 0 -0.5px 0 oklch(1 0 0 / 0.04),
+    0 8px 24px oklch(0 0 0 / 0.35);
+}
+
+.ad-glass-thick {
+  background: var(--glass-3);
+  backdrop-filter: blur(60px) saturate(200%);
+  -webkit-backdrop-filter: blur(60px) saturate(200%);
+  border: 0.5px solid var(--glass-border);
+}
+
+.ad-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "zero" 1;
+  letter-spacing: 0.02em;
+}
+
+.ad-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.ad-no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}

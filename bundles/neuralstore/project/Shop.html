@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuralStore — Engineered for signal</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root { --ink:#000; --paper:#fff; --ink-60:#666; --ink-30:#b0b0b0; --ink-12:#e0e0e0; --ink-06:#f2f2f2; --live:oklch(0.62 0.19 28); --grid-line:rgba(0,0,0,0.06); --mono:'JetBrains Mono',ui-monospace,monospace; --sans:'Helvetica Neue',Helvetica,Arial,sans-serif; }
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.4;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.005em;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+input,textarea{font-family:inherit;border:none;outline:none;background:transparent;color:inherit;}
+a{color:inherit;text-decoration:none;}
+.mono{font-family:var(--mono);letter-spacing:0;}
+.caps{text-transform:uppercase;letter-spacing:0.08em;}
+.display{font-weight:900;letter-spacing:-0.04em;line-height:0.9;font-stretch:condensed;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:#fff;}
+::-webkit-scrollbar-thumb{background:#000;border:2px solid #fff;}
+.placeholder-stripe{background-image:repeating-linear-gradient(-45deg,transparent 0 10px,rgba(0,0,0,0.04) 10px 11px);background-color:#fafafa;}
+.placeholder-stripe-dark{background-image:repeating-linear-gradient(-45deg,transparent 0 10px,rgba(255,255,255,0.06) 10px 11px);background-color:#0a0a0a;}
+.live-dot{display:inline-block;width:6px;height:6px;background:var(--live);border-radius:50%;position:relative;}
+.live-dot.pulse::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--live);animation:pulse 1.6s ease-out infinite;}
+@keyframes pulse{0%{transform:scale(0.6);opacity:1;}100%{transform:scale(2.2);opacity:0;}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:12px;padding:16px 20px;border:1px solid #000;background:#fff;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;transition:background 0.12s,color 0.12s;position:relative;}
+.btn:hover{background:#000;color:#fff;}
+.btn.primary{background:#000;color:#fff;}
+.btn.primary:hover{background:var(--live);border-color:var(--live);color:#fff;}
+.btn.ghost{border:none;padding:12px 0;}
+.btn.ghost:hover{background:none;color:var(--live);}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.anim-slide-up{animation:slideUp 0.35s cubic-bezier(0.2,0.8,0.2,1);}
+.anim-fade{animation:fadeIn 0.3s ease;}
+.chat-bubble{padding:12px 14px;border:1px solid #000;font-size:13px;line-height:1.45;max-width:88%;}
+.chat-bubble.user{background:#000;color:#fff;align-self:flex-end;}
+.chat-bubble.ai{background:#fff;align-self:flex-start;}
+.swiss-check{width:18px;height:18px;border:1px solid #000;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.swiss-check.checked{background:#000;}
+.swiss-check.checked::after{content:'';width:8px;height:4px;border-left:1.5px solid #fff;border-bottom:1.5px solid #fff;transform:rotate(-45deg) translate(1px,-1px);}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.1); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+window.PRODUCTS = [
+  {id:'nx-01',sku:'NX-01 / REV-A',name:'Neural Monitor',category:'Display',tagline:'32" / 6K / 240Hz',price:2490,specs:{Display:'31.5" OLED',Resolution:'6144 × 3456',Refresh:'240 Hz',Latency:'0.02 ms',Color:'P3 98% / 10-bit',Weight:'6.4 kg',Power:'90W USB-C PD'},colorways:['Graphite','Chalk']},
+  {id:'nx-02',sku:'NX-02 / REV-B',name:'Edge Mouse',category:'Input',tagline:'Precision / 26K DPI',price:189,specs:{Sensor:'Optical 26K DPI',Polling:'8000 Hz',Weight:'58 g',Battery:'90 hours',Switches:'Optical, 90M clicks',Material:'Magnesium shell',Connection:'USB-C / 2.4 GHz'},colorways:['Graphite','Chalk','Live']},
+  {id:'nx-03',sku:'NX-03 / REV-A',name:'Keyboard 75',category:'Input',tagline:'Mechanical / Low-profile',price:329,specs:{Layout:'75% / 82 keys',Switches:'Hall-effect analog',Polling:'8000 Hz',Material:'Aluminum CNC',Weight:'980 g',Backlight:'Per-key RGB',Connection:'USB-C / BT 5.3'},colorways:['Graphite','Chalk']},
+  {id:'nx-04',sku:'NX-04 / REV-C',name:'Audio Pods',category:'Audio',tagline:'ANC / Spatial',price:399,specs:{Driver:'11 mm dynamic',ANC:'Adaptive, 42 dB',Battery:'8h / 32h case',Codec:'LDAC / aptX Lossless',Weight:'4.8 g each',Water:'IP57',Latency:'40 ms'},colorways:['Chalk','Graphite']},
+  {id:'nx-05',sku:'NX-05 / REV-A',name:'Dock Station',category:'Accessory',tagline:'14-in-1 / Thunderbolt 5',price:499,specs:{Ports:'14 total',Protocol:'Thunderbolt 5',Power:'140W passthrough',Display:'3× 8K @ 60Hz',Ethernet:'10 GbE',Material:'Machined aluminum',Weight:'720 g'},colorways:['Graphite']},
+  {id:'nx-06',sku:'NX-06 / REV-B',name:'Camera Pro',category:'Video',tagline:'4K / AI Framing',price:279,specs:{Sensor:'1" Sony IMX',Resolution:'4K @ 60fps',Field:'90° adjustable',AI:'Subject tracking',Mic:'Dual beam-forming',Mount:'Magnetic universal',Connection:'USB-C'},colorways:['Graphite','Chalk']}
+];
+</script>
+<script type="text/babel" src="components/TopNav.jsx"></script>
+<script type="text/babel" src="components/Hero.jsx"></script>
+<script type="text/babel" src="components/ProductPreview.jsx"></script>
+<script type="text/babel" src="components/ProductGrid.jsx"></script>
+<script type="text/babel" src="components/Previewer3D.jsx"></script>
+<script type="text/babel" src="components/Assistant.jsx"></script>
+<script type="text/babel" src="components/SmartCheckout.jsx"></script>
+<script type="text/babel" src="components/Sections.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// Tweaks / default configuration
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#e8432a",
+  "borderWeight": 1,
+  "headlineScale": 1,
+  "assistantOpenByDefault": true,
+  "ticking": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+  const [tweaksOn, setTweaksOn] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const products = window.PRODUCTS || [];
+  const [cart, setCart] = useState(() => {
+    const m = products.find(p => p.id === 'nx-02');
+    const k = products.find(p => p.id === 'nx-03');
+    return [m && { ...m, qty: 1 }, k && { ...k, qty: 1 }].filter(Boolean);
+  });
+  const [assistantOpen, setAssistantOpen] = useState(tweaks.assistantOpenByDefault);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [clock, setClock] = useState(new Date());
+
+  // Ticking clock (tweakable)
+  useEffect(() => {
+    if (!tweaks.ticking) return;
+    const id = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(id);
+  }, [tweaks.ticking]);
+
+  // Apply accent color to CSS variable
+  useEffect(() => {
+    document.documentElement.style.setProperty('--live', tweaks.accent);
+  }, [tweaks.accent]);
+
+  // Tweaks protocol
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksOn(true);
+      else if (e.data?.type === '__deactivate_edit_mode') setTweaksOn(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const setTweak = (key, value) => {
+    setTweaks(t => {
+      const next = { ...t, [key]: value };
+      window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: value } }, '*');
+      return next;
+    });
+  };
+
+  const addToCart = (product) => {
+    setCart(c => {
+      const existing = c.find(i => i.id === product.id);
+      if (existing) return c.map(i => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
+      return [...c, { ...product, qty: 1 }];
+    });
+  };
+
+  const removeFromCart = (id) => {
+    setCart(c => c.filter(i => i.id !== id));
+  };
+
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+
+  return (
+    <div style={{
+      fontSize: `${14 * tweaks.headlineScale}px`,
+    }}>
+      {/* Status ribbon - very top */}
+      <div style={{
+        background: '#000',
+        color: '#fff',
+        padding: '6px 32px',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        fontFamily: 'var(--mono)',
+        fontSize: 10,
+        textTransform: 'uppercase',
+        letterSpacing: '0.1em',
+      }}>
+        <div>SF — 60°F · clear</div>
+        <div style={{ textAlign: 'center' }}>
+          Free expedited shipping on orders over $500
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          {clock.toLocaleTimeString('en-US', { hour12: false })} PT
+        </div>
+      </div>
+
+      <TopNav
+        cartCount={cartCount}
+        onCartClick={() => setCheckoutOpen(true)}
+        onAssistantClick={() => setAssistantOpen(a => !a)}
+        assistantOpen={assistantOpen}
+      />
+
+      <Hero onExplore={() => {
+        document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }} />
+
+      <div id="catalog">
+        <ProductGrid
+          products={products}
+          onSelectProduct={(p) => setSelectedProduct(p)}
+          onAddToCart={addToCart}
+        />
+      </div>
+
+      <Editorial />
+      <Footer />
+
+      {/* Floating UI */}
+      <Previewer3D
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={addToCart}
+      />
+      <Assistant
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        onRecommend={(p) => setSelectedProduct(p)}
+        products={products}
+        cart={cart}
+      />
+      <SmartCheckout
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        cart={cart}
+        onRemove={removeFromCart}
+        onComplete={() => setCart([])}
+      />
+
+      {/* Assistant launcher (when closed) */}
+      {!assistantOpen && !selectedProduct && !checkoutOpen && (
+        <button
+          onClick={() => setAssistantOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            padding: '14px 18px',
+            background: '#000',
+            color: '#fff',
+            border: '1px solid #000',
+            fontFamily: 'var(--mono)',
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+            zIndex: 100,
+            boxShadow: '4px 4px 0 #000',
+          }}
+        >
+          <span className="live-dot pulse" />
+          Ask Atlas
+        </button>
+      )}
+
+      {/* Tweaks panel */}
+      {tweaksOn && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          left: 24,
+          width: 280,
+          background: '#fff',
+          border: '1px solid #000',
+          boxShadow: '6px 6px 0 #000',
+          zIndex: 300,
+          padding: '16px',
+          fontFamily: 'var(--sans)',
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingBottom: 10,
+            borderBottom: '1px solid #000',
+            marginBottom: 14,
+          }}>
+            <div className="mono caps" style={{ fontSize: 11, fontWeight: 600 }}>Tweaks</div>
+            <div className="mono" style={{ fontSize: 10, color: '#666' }}>Live</div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <div className="mono caps" style={{ fontSize: 10, color: '#666', marginBottom: 8 }}>
+                Accent color
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[
+                  ['#e8432a', 'Live'],
+                  ['#1e90ff', 'Signal'],
+                  ['#000000', 'Ink'],
+                  ['#6a4cff', 'Violet'],
+                ].map(([c, name]) => (
+                  <button
+                    key={c}
+                    onClick={() => setTweak('accent', c)}
+                    style={{
+                      flex: 1,
+                      height: 32,
+                      background: c,
+                      border: tweaks.accent === c ? '2px solid #000' : '1px solid #000',
+                      cursor: 'pointer',
+                    }}
+                    title={name}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mono caps" style={{ fontSize: 10, color: '#666', marginBottom: 8 }}>
+                Headline scale — {tweaks.headlineScale.toFixed(2)}×
+              </div>
+              <input
+                type="range"
+                min="0.8" max="1.3" step="0.05"
+                value={tweaks.headlineScale}
+                onChange={(e) => setTweak('headlineScale', parseFloat(e.target.value))}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: 12 }}>
+              <div
+                className={`swiss-check ${tweaks.ticking ? 'checked' : ''}`}
+                onClick={() => setTweak('ticking', !tweaks.ticking)}
+              />
+              Clock ticks live
+            </label>
+
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: 12 }}>
+              <div
+                className={`swiss-check ${tweaks.assistantOpenByDefault ? 'checked' : ''}`}
+                onClick={() => setTweak('assistantOpenByDefault', !tweaks.assistantOpenByDefault)}
+              />
+              Assistant open by default
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function mount() {
+  if (!window.PRODUCTS || !window.TopNav || !window.Hero || !window.ProductGrid ||
+      !window.Previewer3D || !window.Assistant || !window.SmartCheckout ||
+      !window.Editorial || !window.Footer || !window.ProductPreviewPlaceholder) {
+    setTimeout(mount, 50);
+    return;
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+}
+mount();
+</script>
+
+</body>
+</html>

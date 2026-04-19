@@ -1,0 +1,1413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Frontier — The AI-native IDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Alumni+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink-0: #060708;
+    --ink-1: #0A0B0D;
+    --ink-2: #14161A;
+    --ink-3: #1C1F24;
+    --ink-4: #2A2E35;
+    --ink-5: #3A3F48;
+    --ink-6: #4A4F58;
+    --ink-7: #6B7079;
+    --ink-8: #8B9099;
+    --ink-9: #B0B5BC;
+    --ink-10: #C7CBD1;
+    --ink-11: #DEE0E4;
+    --ink-12: #E8EAED;
+    --ink-13: #F5F6F7;
+    --fg: var(--ink-13);
+    --bg: var(--ink-1);
+    --line: #23262C;
+    --line-soft: #1A1D22;
+    --ease: cubic-bezier(.2,.7,.2,1);
+    --t: 160ms var(--ease);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter Tight', system-ui, sans-serif;
+    font-feature-settings: 'ss01','cv11';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 16px;
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+    overflow-x: hidden;
+  }
+
+  ::selection { background: var(--ink-12); color: var(--ink-1); }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'ss02','zero'; }
+  .ann {
+    font-family: 'Alumni Sans SC', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+    color: var(--ink-8);
+  }
+
+  /* ============= GRID BACKDROP ============= */
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    opacity: .35;
+    background:
+      radial-gradient(1200px 700px at 75% -10%, rgba(255,255,255,0.035), transparent 60%),
+      radial-gradient(800px 500px at 0% 30%, rgba(255,255,255,0.02), transparent 60%);
+  }
+  .noise {
+    position: fixed; inset: 0; pointer-events: none; z-index: 2; opacity: .04;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .8 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  .wrap { position: relative; z-index: 3; }
+
+  /* ============= NAV ============= */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    background: rgba(10,11,13,0.72);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .nav-inner {
+    max-width: 1360px; margin: 0 auto;
+    padding: 14px 32px;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 32px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.02em; font-size: 15px; }
+  .brand-mark {
+    width: 22px; height: 22px; position: relative; display: inline-block;
+  }
+  .brand-mark::before, .brand-mark::after {
+    content: ""; position: absolute; inset: 0; border: 1px solid var(--ink-12);
+  }
+  .brand-mark::before { transform: rotate(0deg); }
+  .brand-mark::after { transform: rotate(45deg) scale(.72); border-color: var(--ink-8); }
+
+  .nav-links { display: flex; gap: 4px; justify-content: center; }
+  .nav-links a {
+    color: var(--ink-9); text-decoration: none; font-size: 13.5px;
+    padding: 8px 14px; border-radius: 4px;
+    transition: color var(--t), background var(--t);
+  }
+  .nav-links a:hover { color: var(--ink-13); background: var(--ink-3); }
+
+  .nav-cta { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .nav-status {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-8);
+    display: flex; align-items: center; gap: 6px; margin-right: 8px;
+  }
+  .pulse {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--ink-12);
+    box-shadow: 0 0 8px rgba(255,255,255,0.6);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+
+  /* ============= BUTTONS ============= */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 13.5px; font-weight: 500;
+    padding: 9px 16px; border-radius: 3px;
+    border: 1px solid transparent; cursor: pointer;
+    text-decoration: none; line-height: 1; letter-spacing: -0.005em;
+    transition: background var(--t), border-color var(--t), color var(--t), transform var(--t);
+  }
+  .btn-primary {
+    background: var(--ink-13); color: var(--ink-1); border-color: var(--ink-13);
+  }
+  .btn-primary:hover { background: var(--ink-11); border-color: var(--ink-11); }
+  .btn-ghost {
+    background: transparent; color: var(--ink-12); border-color: var(--ink-4);
+  }
+  .btn-ghost:hover { background: var(--ink-3); border-color: var(--ink-6); }
+  .btn-outline {
+    background: transparent; color: var(--ink-12); border-color: var(--ink-5);
+  }
+  .btn-outline:hover { background: var(--ink-3); border-color: var(--ink-8); }
+  .btn-link {
+    padding: 0; background: none; border: none; color: var(--ink-10);
+    font-size: 13.5px; text-decoration: none; cursor: pointer;
+    transition: color var(--t);
+  }
+  .btn-link:hover { color: var(--ink-13); }
+  .btn-lg { padding: 13px 22px; font-size: 14.5px; }
+
+  /* ============= HERO ============= */
+  .hero {
+    max-width: 1360px; margin: 0 auto;
+    padding: 48px 32px 120px;
+    display: grid;
+    grid-template-columns: 7fr 5fr;
+    gap: 56px;
+    align-items: start;
+    position: relative;
+  }
+  .hero::before {
+    content: ""; position: absolute; left: 32px; right: 32px; top: 0;
+    height: 1px; background: var(--line);
+  }
+  .hero-left { padding-top: 48px; position: relative; }
+  .hero-meta {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 40px;
+    font-size: 11px; letter-spacing: 0.12em;
+  }
+  .hero-meta .idx {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 18px;
+    color: var(--ink-13); letter-spacing: 0.04em; font-weight: 600;
+  }
+  .hero-meta .divider { width: 36px; height: 1px; background: var(--ink-6); }
+
+  h1.hero-title {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 400;
+    font-size: clamp(44px, 6.2vw, 96px);
+    line-height: 0.98;
+    letter-spacing: -0.042em;
+    margin: 0 0 32px;
+    color: var(--ink-13);
+  }
+  h1.hero-title em {
+    font-style: italic; font-weight: 300;
+    color: var(--ink-8);
+  }
+  h1.hero-title .slash {
+    color: var(--ink-6); font-weight: 300; margin: 0 0.1em;
+  }
+
+  .hero-sub {
+    font-size: 18px; line-height: 1.45; color: var(--ink-9);
+    max-width: 520px; margin: 0 0 40px;
+    letter-spacing: -0.01em;
+  }
+  .hero-sub b { color: var(--ink-12); font-weight: 500; }
+
+  .hero-ctas { display: flex; gap: 10px; align-items: center; margin-bottom: 56px; }
+  .hero-ctas .note { margin-left: 12px; font-size: 12px; color: var(--ink-7); }
+
+  .hero-specs {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--line);
+    padding-top: 28px;
+    gap: 24px;
+  }
+  .spec .label {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-7); margin-bottom: 8px;
+  }
+  .spec .val {
+    font-size: 22px; font-weight: 500; color: var(--ink-13);
+    letter-spacing: -0.02em; line-height: 1.1;
+  }
+  .spec .val .unit { color: var(--ink-7); font-weight: 400; font-size: 14px; margin-left: 3px; }
+  .spec .desc { font-size: 11.5px; color: var(--ink-7); margin-top: 4px; line-height: 1.4; }
+
+  /* ===== Hero right: editor mock ===== */
+  .hero-right {
+    position: relative;
+    padding-top: 96px;
+  }
+  .editor {
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 40px 80px -30px rgba(0,0,0,0.8),
+      0 20px 40px -20px rgba(0,0,0,0.6);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-10);
+  }
+  .editor-chrome {
+    display: grid; grid-template-columns: auto 1fr auto;
+    align-items: center; gap: 12px;
+    padding: 10px 12px; background: var(--ink-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-4); border: 1px solid var(--ink-5); }
+  .tabs { display: flex; gap: 1px; font-size: 11px; }
+  .tab {
+    padding: 5px 12px; background: var(--ink-3); color: var(--ink-8);
+    border: 1px solid var(--line); border-bottom: none;
+    border-top-left-radius: 3px; border-top-right-radius: 3px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tab.active { background: var(--ink-1); color: var(--ink-12); }
+  .tab .x { color: var(--ink-6); font-size: 10px; }
+  .editor-path { font-size: 11px; color: var(--ink-7); display: flex; align-items: center; gap: 6px; }
+  .editor-path .sep { color: var(--ink-5); }
+
+  .editor-body { display: grid; grid-template-columns: 40px 1fr; min-height: 380px; background: var(--ink-1); }
+  .gutter {
+    padding: 16px 0; text-align: right; color: var(--ink-6);
+    font-size: 11.5px; border-right: 1px solid var(--line-soft);
+    user-select: none;
+  }
+  .gutter div { padding: 0 10px; line-height: 1.7; }
+  .code { padding: 16px 16px 16px 18px; line-height: 1.7; overflow: hidden; }
+  .code .ln { white-space: pre; }
+  .k { color: var(--ink-10); }
+  .c { color: var(--ink-7); font-style: italic; }
+  .s { color: var(--ink-11); }
+  .f { color: var(--ink-13); }
+  .p { color: var(--ink-8); }
+  .n { color: var(--ink-9); }
+
+  /* Ghost completion */
+  .ghost {
+    background: var(--ink-3); color: var(--ink-9);
+    border-left: 2px solid var(--ink-11);
+    padding: 2px 6px; border-radius: 2px;
+    margin-left: 2px;
+    position: relative;
+  }
+  .ghost::after {
+    content: "TAB"; position: absolute; right: -30px; top: 50%; transform: translateY(-50%);
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 11px; letter-spacing: .08em;
+    color: var(--ink-7); background: var(--ink-2);
+    padding: 1px 4px; border: 1px solid var(--line); border-radius: 2px;
+  }
+
+  .caret { display: inline-block; width: 2px; height: 14px; background: var(--ink-13); vertical-align: middle; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .editor-foot {
+    display: grid; grid-template-columns: 1fr auto; align-items: center;
+    padding: 6px 12px;
+    background: var(--ink-2); border-top: 1px solid var(--line);
+    font-size: 10.5px; color: var(--ink-7); letter-spacing: 0.04em;
+  }
+  .editor-foot .left { display: flex; gap: 14px; }
+  .editor-foot .left span strong { color: var(--ink-10); font-weight: 500; }
+  .editor-foot .right { display: flex; gap: 14px; align-items: center; }
+  .agent-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 7px; border: 1px solid var(--ink-5); border-radius: 2px;
+    color: var(--ink-11);
+  }
+  .agent-badge .dotb { width: 5px; height: 5px; border-radius: 50%; background: var(--ink-13); animation: pulse 2s ease-in-out infinite; }
+
+  /* Floating panels behind editor */
+  .float-panel {
+    position: absolute; background: var(--ink-2); border: 1px solid var(--line);
+    border-radius: 5px; padding: 12px 14px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-10);
+    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.8);
+  }
+  .float-agent {
+    top: 20px; left: -40px; width: 240px; z-index: 2;
+  }
+  .float-agent .head {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 13px; letter-spacing: 0.1em;
+    color: var(--ink-8); margin-bottom: 8px; display: flex; justify-content: space-between;
+  }
+  .float-agent .msg { color: var(--ink-11); font-size: 11.5px; line-height: 1.5; }
+  .float-agent .msg span { color: var(--ink-8); }
+
+  .float-diff {
+    bottom: -28px; right: -24px; width: 220px; z-index: 2;
+  }
+  .float-diff .row { display: flex; gap: 8px; padding: 1px 0; }
+  .float-diff .row .sign { width: 10px; color: var(--ink-7); }
+  .float-diff .row.add .sign { color: var(--ink-12); }
+  .float-diff .row.rem { color: var(--ink-7); }
+  .float-diff .row.rem .code-t { text-decoration: line-through; }
+  .float-diff .row.add .code-t { color: var(--ink-13); }
+
+  /* Corner crosshairs */
+  .crosshair {
+    position: absolute; width: 14px; height: 14px;
+    border: 1px solid var(--ink-6);
+  }
+  .crosshair.tl { top: -8px; left: -8px; border-right: none; border-bottom: none; }
+  .crosshair.tr { top: -8px; right: -8px; border-left: none; border-bottom: none; }
+  .crosshair.bl { bottom: -8px; left: -8px; border-right: none; border-top: none; }
+  .crosshair.br { bottom: -8px; right: -8px; border-left: none; border-top: none; }
+
+  /* ============= LOGO BAR ============= */
+  .logobar {
+    max-width: 1360px; margin: 0 auto;
+    padding: 0 32px 80px;
+    border-top: 1px solid var(--line);
+  }
+  .logobar-inner {
+    padding-top: 32px;
+    display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center;
+  }
+  .logobar-label {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-7);
+  }
+  .logos {
+    display: flex; gap: 48px; align-items: center;
+    color: var(--ink-7); font-family: 'Inter Tight', sans-serif;
+    font-size: 18px; font-weight: 500; letter-spacing: -0.02em;
+  }
+  .logos > span { opacity: .8; transition: opacity var(--t), color var(--t); }
+  .logos > span:hover { opacity: 1; color: var(--ink-11); }
+  .logos i { font-style: normal; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--ink-9); margin-right: 4px; }
+
+  /* ============= SECTION HEADER ============= */
+  .section {
+    max-width: 1360px; margin: 0 auto;
+    padding: 120px 32px;
+    position: relative;
+  }
+  .sec-head {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 32px;
+    align-items: end; padding-bottom: 40px; margin-bottom: 48px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sec-idx {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 64px;
+    color: var(--ink-6); letter-spacing: 0.02em; font-weight: 500;
+    line-height: 1;
+  }
+  .sec-title {
+    font-size: clamp(36px, 4.2vw, 60px); font-weight: 400;
+    letter-spacing: -0.035em; line-height: 1; color: var(--ink-13);
+    margin: 0;
+  }
+  .sec-title em { font-style: italic; font-weight: 300; color: var(--ink-8); }
+  .sec-meta {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-7);
+    text-align: right;
+  }
+
+  /* ============= BENTO ============= */
+  .bento {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: 180px;
+    gap: 16px;
+  }
+  .cell {
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color var(--t), background var(--t), transform var(--t);
+    display: flex; flex-direction: column;
+  }
+  .cell:hover { border-color: var(--ink-6); background: #16181D; }
+  .cell .tag {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 13px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-7);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cell .tag .num { color: var(--ink-9); }
+  .cell h3 {
+    font-size: 22px; font-weight: 500; margin: 12px 0 8px;
+    letter-spacing: -0.022em; color: var(--ink-13); line-height: 1.1;
+  }
+  .cell p {
+    font-size: 13.5px; color: var(--ink-9); line-height: 1.5; margin: 0;
+    max-width: 380px;
+  }
+  .cell .visual { flex: 1; display: flex; align-items: flex-end; margin-top: 16px; }
+
+  /* sizes */
+  .cA { grid-column: span 4; grid-row: span 2; }
+  .cB { grid-column: span 2; grid-row: span 2; }
+  .cC { grid-column: span 2; grid-row: span 2; }
+  .cD { grid-column: span 2; grid-row: span 1; }
+  .cE { grid-column: span 2; grid-row: span 1; }
+  .cF { grid-column: span 3; grid-row: span 2; }
+  .cG { grid-column: span 3; grid-row: span 2; }
+
+  /* Cell A: Agent panel */
+  .cA { padding: 0; overflow: hidden; }
+  .cA-head { padding: 22px 22px 0; }
+  .cA-chat { flex: 1; padding: 4px 22px 22px; display: flex; flex-direction: column; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; overflow: hidden; position: relative; }
+  .chat-row { display: flex; gap: 10px; }
+  .chat-row .who { color: var(--ink-7); width: 18px; flex: 0 0 18px; }
+  .chat-row.user .text { color: var(--ink-11); }
+  .chat-row.agent .text { color: var(--ink-10); background: var(--ink-3); padding: 6px 10px; border-radius: 3px; border-left: 2px solid var(--ink-8); }
+  .chat-row .text { line-height: 1.5; }
+  .chat-row.agent .text code { color: var(--ink-13); background: var(--ink-4); padding: 0 4px; border-radius: 2px; }
+  .cA-scrim { position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: linear-gradient(transparent, var(--ink-2)); pointer-events: none; }
+
+  /* Cell B: Inline predict */
+  .cB .pred-vis {
+    margin-top: auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--ink-10);
+    background: var(--ink-1); border: 1px solid var(--line); border-radius: 4px;
+    padding: 10px 12px; line-height: 1.7;
+  }
+  .cB .pred-vis .ghost2 { background: var(--ink-4); color: var(--ink-11); padding: 0 4px; }
+  .cB .pred-vis .cursor { display: inline-block; width: 1.5px; height: 12px; background: var(--ink-13); vertical-align: middle; animation: blink 1s steps(1) infinite; }
+
+  /* Cell C: Terminal */
+  .cC .term {
+    flex: 1; margin-top: 14px;
+    background: var(--ink-1); border: 1px solid var(--line); border-radius: 4px;
+    padding: 10px 12px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-10); line-height: 1.6;
+    overflow: hidden; position: relative;
+  }
+  .term .prompt { color: var(--ink-7); }
+  .term .ok { color: var(--ink-12); }
+  .term .dim { color: var(--ink-7); }
+  .term .bar {
+    display: inline-block; width: 100%; height: 3px; background: var(--ink-3); margin-top: 2px; position: relative;
+  }
+  .term .bar::before { content: ""; position: absolute; inset: 0; width: 72%; background: var(--ink-11); }
+
+  /* Cell D/E: KPI tiles */
+  .kpi .big {
+    font-size: 52px; font-weight: 400; letter-spacing: -0.04em; color: var(--ink-13);
+    line-height: 1; margin-top: auto;
+  }
+  .kpi .big .u { color: var(--ink-7); font-size: 20px; margin-left: 4px; font-weight: 400; }
+  .kpi .caption {
+    font-size: 12px; color: var(--ink-8); margin-top: 8px; line-height: 1.4; max-width: 280px;
+  }
+
+  /* Cell F: Multi-file refactor */
+  .cF .files {
+    flex: 1; margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    display: grid; gap: 2px;
+  }
+  .file-row {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 12px;
+    padding: 5px 10px; align-items: center;
+    background: var(--ink-1); border: 1px solid var(--line-soft); border-radius: 3px;
+    color: var(--ink-10);
+  }
+  .file-row .path { color: var(--ink-9); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-row .path .dim { color: var(--ink-6); }
+  .file-row .diff { color: var(--ink-8); font-size: 10.5px; letter-spacing: .04em; }
+  .file-row .diff .plus { color: var(--ink-13); }
+  .file-row .diff .minus { color: var(--ink-7); }
+  .file-row .tick { color: var(--ink-7); font-size: 10px; }
+  .file-row.active { border-color: var(--ink-6); background: var(--ink-2); }
+
+  /* Cell G: graph */
+  .cG .graph {
+    flex: 1; margin-top: 14px; position: relative;
+    background:
+      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 100% 20%,
+      var(--ink-1);
+    border: 1px solid var(--line-soft); border-radius: 4px;
+    overflow: hidden;
+  }
+  .cG .graph svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .cG .graph .lbl {
+    position: absolute; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-8);
+    background: var(--ink-2); border: 1px solid var(--line); padding: 2px 6px; border-radius: 2px;
+  }
+
+  /* ============= COMPARE / STRIP ============= */
+  .strip {
+    max-width: 1360px; margin: 0 auto;
+    padding: 0 32px;
+  }
+  .compare {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 80px 0;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  }
+  .compare .side { padding: 0 48px; border-left: 1px solid var(--line); }
+  .compare .side:first-child { border-left: none; padding-left: 0; }
+  .compare .side .ann { display: block; margin-bottom: 14px; font-size: 14px; }
+  .compare h4 {
+    font-size: 28px; font-weight: 400; letter-spacing: -0.025em;
+    margin: 0 0 16px; line-height: 1.1;
+  }
+  .compare .old h4 { color: var(--ink-7); text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: var(--ink-6); }
+  .compare .new h4 { color: var(--ink-13); }
+  .compare ul {
+    list-style: none; padding: 0; margin: 0;
+    font-size: 14px; line-height: 1.7;
+  }
+  .compare .old ul li { color: var(--ink-7); }
+  .compare .new ul li { color: var(--ink-11); }
+  .compare ul li { display: flex; gap: 10px; padding: 4px 0; border-top: 1px solid var(--line-soft); }
+  .compare ul li:first-child { border-top: none; }
+  .compare ul li .mark {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--ink-6); width: 14px; flex: 0 0 14px;
+  }
+  .compare .new ul li .mark { color: var(--ink-12); }
+
+  /* ============= QUOTES ============= */
+  .quotes {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  .quote {
+    border: 1px solid var(--line); border-radius: 6px; padding: 28px;
+    background: var(--ink-2);
+    display: flex; flex-direction: column; gap: 20px;
+    transition: border-color var(--t), background var(--t);
+  }
+  .quote:hover { border-color: var(--ink-6); background: #16181D; }
+  .quote .q { font-size: 18px; line-height: 1.4; color: var(--ink-12); letter-spacing: -0.012em; font-weight: 400; flex: 1; }
+  .quote .q::before { content: "\201C"; color: var(--ink-6); font-size: 32px; line-height: 0; display: block; margin-bottom: 8px; }
+  .quote .who { display: flex; gap: 12px; align-items: center; border-top: 1px solid var(--line); padding-top: 16px; }
+  .quote .who .av {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: repeating-linear-gradient(45deg, var(--ink-4) 0 4px, var(--ink-3) 4px 8px);
+    border: 1px solid var(--ink-5);
+    flex: 0 0 32px;
+  }
+  .quote .who .n { font-size: 13px; color: var(--ink-12); font-weight: 500; letter-spacing: -0.005em; }
+  .quote .who .r { font-size: 11px; color: var(--ink-7); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em; margin-top: 2px; }
+
+  /* ============= PRICING ============= */
+  .price-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+    border: 1px solid var(--line); border-radius: 6px;
+    overflow: hidden;
+  }
+  .price {
+    padding: 36px 32px; background: var(--ink-2);
+    border-left: 1px solid var(--line);
+    display: flex; flex-direction: column;
+  }
+  .price:first-child { border-left: none; }
+  .price.featured { background: var(--ink-3); position: relative; }
+  .price.featured::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    border: 1px solid var(--ink-6);
+  }
+  .price .name {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 16px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-11);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .price .name .badge {
+    font-size: 10px; letter-spacing: 0.14em;
+    padding: 2px 6px; border: 1px solid var(--ink-8); color: var(--ink-12);
+    border-radius: 2px;
+  }
+  .price .amt { margin: 18px 0 6px; display: flex; align-items: baseline; gap: 4px; }
+  .price .amt .currency { font-size: 20px; color: var(--ink-8); font-weight: 400; }
+  .price .amt .num { font-size: 56px; font-weight: 400; letter-spacing: -0.04em; color: var(--ink-13); line-height: 1; }
+  .price .amt .per { font-size: 13px; color: var(--ink-7); }
+  .price .desc { font-size: 13px; color: var(--ink-9); margin-bottom: 24px; min-height: 40px; }
+  .price ul {
+    list-style: none; padding: 0; margin: 0 0 28px;
+    font-size: 13px; flex: 1;
+  }
+  .price ul li {
+    padding: 9px 0; display: flex; gap: 10px; align-items: flex-start;
+    border-top: 1px solid var(--line-soft); color: var(--ink-10);
+  }
+  .price ul li:first-child { border-top: none; }
+  .price ul li .chk { color: var(--ink-8); font-family: 'JetBrains Mono', monospace; font-size: 11px; width: 14px; flex: 0 0 14px; margin-top: 2px; }
+  .price ul li.on .chk { color: var(--ink-13); }
+  .price ul li.off { color: var(--ink-6); }
+  .price ul li.off .chk { color: var(--ink-6); }
+  .price .cta { width: 100%; justify-content: center; }
+
+  /* ============= FAQ ============= */
+  .faq { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; }
+  .faq-items { border-top: 1px solid var(--line); }
+  .faq-item { border-bottom: 1px solid var(--line); padding: 22px 0; display: grid; grid-template-columns: 40px 1fr auto; gap: 20px; align-items: start; cursor: pointer; transition: background var(--t); }
+  .faq-item:hover { background: rgba(255,255,255,0.01); }
+  .faq-item .n { font-family: 'Alumni Sans SC', sans-serif; font-size: 18px; color: var(--ink-7); letter-spacing: 0.04em; padding-top: 2px; }
+  .faq-item .q { font-size: 17px; color: var(--ink-13); font-weight: 400; letter-spacing: -0.012em; }
+  .faq-item .a { font-size: 14px; color: var(--ink-9); margin-top: 10px; line-height: 1.55; display: none; }
+  .faq-item.open .a { display: block; }
+  .faq-item .plus {
+    width: 20px; height: 20px; position: relative; flex: 0 0 20px;
+    border: 1px solid var(--ink-6); border-radius: 2px;
+    transition: border-color var(--t), background var(--t);
+  }
+  .faq-item .plus::before, .faq-item .plus::after {
+    content: ""; position: absolute; background: var(--ink-11);
+    transition: transform var(--t);
+  }
+  .faq-item .plus::before { left: 4px; right: 4px; top: 50%; height: 1px; transform: translateY(-50%); }
+  .faq-item .plus::after { top: 4px; bottom: 4px; left: 50%; width: 1px; transform: translateX(-50%); }
+  .faq-item.open .plus::after { transform: translateX(-50%) rotate(90deg); opacity: 0; }
+  .faq-item.open .plus { border-color: var(--ink-9); }
+
+  /* ============= CTA ============= */
+  .cta-block {
+    max-width: 1360px; margin: 0 auto;
+    padding: 120px 32px;
+    border-top: 1px solid var(--line);
+    text-align: center;
+    position: relative;
+  }
+  .cta-block .ann { margin-bottom: 24px; display: block; }
+  .cta-block h2 {
+    font-size: clamp(48px, 7vw, 120px);
+    font-weight: 300;
+    letter-spacing: -0.045em;
+    line-height: 0.92;
+    margin: 0 0 36px;
+    color: var(--ink-13);
+  }
+  .cta-block h2 em { font-style: italic; font-weight: 300; color: var(--ink-8); }
+  .cta-block .ctas { display: inline-flex; gap: 10px; margin-bottom: 14px; }
+  .cta-block .fine { font-size: 12px; color: var(--ink-7); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+
+  /* ============= FOOTER ============= */
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 48px 32px 32px;
+    max-width: 1360px; margin: 0 auto;
+  }
+  .foot-top {
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    gap: 40px; padding-bottom: 48px;
+    border-bottom: 1px solid var(--line);
+  }
+  .foot-top h5 {
+    font-family: 'Alumni Sans SC', sans-serif; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-7);
+    margin: 0 0 16px; font-weight: 500;
+  }
+  .foot-top ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .foot-top a { color: var(--ink-10); text-decoration: none; font-size: 13px; transition: color var(--t); }
+  .foot-top a:hover { color: var(--ink-13); }
+  .foot-top .about p { color: var(--ink-9); font-size: 13px; line-height: 1.5; max-width: 320px; margin: 16px 0 0; }
+
+  .foot-bottom {
+    padding-top: 24px;
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; gap: 24px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-7);
+    letter-spacing: 0.04em;
+  }
+  .foot-bottom .r { text-align: right; }
+  .big-word {
+    font-family: 'Inter Tight', sans-serif; font-weight: 300;
+    font-size: clamp(120px, 22vw, 340px);
+    letter-spacing: -0.06em; line-height: 0.8;
+    color: var(--ink-2);
+    -webkit-text-stroke: 1px var(--ink-4);
+    text-align: center; margin: 40px 0 20px;
+    user-select: none;
+    background: linear-gradient(180deg, var(--ink-3), var(--ink-1));
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /* ============= TWEAKS PANEL ============= */
+  .tweaks {
+    position: fixed; right: 20px; bottom: 20px;
+    width: 280px; background: var(--ink-2); border: 1px solid var(--line);
+    border-radius: 6px; z-index: 100; font-size: 13px;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.8);
+    display: none;
+    overflow: hidden;
+  }
+  .tweaks.on { display: block; }
+  .tweaks .h {
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+    font-family: 'Alumni Sans SC', sans-serif; letter-spacing: 0.12em;
+    text-transform: uppercase; font-size: 13px; color: var(--ink-11);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .tweaks .h .dotg { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-11); }
+  .tweaks .b { padding: 14px; display: grid; gap: 14px; }
+  .tweaks label { display: grid; gap: 6px; font-size: 11px; color: var(--ink-8); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+  .tweaks label .val { color: var(--ink-11); }
+  .tweaks select, .tweaks input[type="range"] {
+    width: 100%; background: var(--ink-1); border: 1px solid var(--line);
+    color: var(--ink-12); padding: 6px 8px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .tweaks input[type="range"] { padding: 0; accent-color: var(--ink-12); }
+  .tweak-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .tweak-opt {
+    padding: 6px 4px; border: 1px solid var(--line); border-radius: 3px;
+    background: var(--ink-1); color: var(--ink-9); font-size: 11px; text-align: center;
+    cursor: pointer; transition: var(--t);
+  }
+  .tweak-opt:hover { border-color: var(--ink-6); color: var(--ink-12); }
+  .tweak-opt.sel { border-color: var(--ink-11); color: var(--ink-13); background: var(--ink-3); }
+
+  /* Variants */
+  body[data-density="compact"] .section { padding: 72px 32px; }
+  body[data-density="spacious"] .section { padding: 160px 32px; }
+
+  body[data-hero="centered"] .hero { grid-template-columns: 1fr; text-align: center; }
+  body[data-hero="centered"] .hero-left { padding-top: 80px; }
+  body[data-hero="centered"] .hero-sub { margin-left: auto; margin-right: auto; }
+  body[data-hero="centered"] .hero-ctas { justify-content: center; }
+  body[data-hero="centered"] .hero-specs { max-width: 720px; margin: 0 auto; }
+  body[data-hero="centered"] .hero-right { display: none; }
+  body[data-hero="centered"] .hero::after {
+    content: ""; display: block; grid-column: 1 / -1;
+    height: 360px; margin-top: 32px;
+    background: var(--ink-2); border: 1px solid var(--line); border-radius: 6px;
+  }
+
+  body[data-tone="frost"] { --bg: #0E1013; --line: #262A30; --ink-1: #0E1013; }
+  body[data-tone="graphite"] { --bg: #121316; --line: #252830; }
+  body[data-tone="obsidian"] { --bg: #050608; --line: #1F2228; --ink-1: #050608; }
+
+  body[data-corners="sharp"] .cell,
+  body[data-corners="sharp"] .quote,
+  body[data-corners="sharp"] .price-grid,
+  body[data-corners="sharp"] .editor,
+  body[data-corners="sharp"] .btn { border-radius: 0; }
+
+  @media (max-width: 1100px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { padding-top: 0; }
+    .bento { grid-template-columns: repeat(2, 1fr); }
+    .cA, .cB, .cC, .cD, .cE, .cF, .cG { grid-column: span 2; grid-row: auto; }
+    .quotes { grid-template-columns: 1fr; }
+    .price-grid { grid-template-columns: 1fr; }
+    .price { border-left: none; border-top: 1px solid var(--line); }
+    .price:first-child { border-top: none; }
+    .compare { grid-template-columns: 1fr; }
+    .compare .side { border-left: none; padding: 0; }
+    .compare .side + .side { border-top: 1px solid var(--line); padding-top: 32px; margin-top: 32px; }
+    .foot-top { grid-template-columns: 1fr 1fr; }
+    .faq { grid-template-columns: 1fr; }
+    .sec-head { grid-template-columns: auto 1fr; }
+    .sec-meta { display: none; }
+  }
+</style>
+</head>
+<body data-density="normal" data-hero="asymmetric" data-tone="default" data-corners="round">
+
+<div class="grain"></div>
+<div class="noise"></div>
+
+<div class="wrap">
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>Frontier</span>
+      <span class="ann" style="font-size:12px; margin-left: 6px;">v0.24 · Canary</span>
+    </div>
+    <div class="nav-links">
+      <a href="#features">Product</a>
+      <a href="#compare">Agents</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#docs">Docs</a>
+      <a href="#changelog">Changelog</a>
+    </div>
+    <div class="nav-cta">
+      <span class="nav-status"><span class="pulse"></span> all systems nominal</span>
+      <a href="#" class="btn btn-ghost">Sign in</a>
+      <a href="#" class="btn btn-primary">Download →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-meta">
+      <span class="idx ann">001 / Introducing</span>
+      <span class="divider"></span>
+      <span class="ann">The AI-native IDE</span>
+    </div>
+
+    <h1 class="hero-title">
+      Write code<br>
+      at the speed<span class="slash"> / </span><em>of thought.</em>
+    </h1>
+
+    <p class="hero-sub">
+      Frontier is a keyboard-first editor that runs a <b>persistent agent</b> across your entire codebase. It predicts your next edit, refactors in parallel, and ships to production without leaving the buffer.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#" class="btn btn-primary btn-lg">Download for macOS</a>
+      <a href="#" class="btn btn-ghost btn-lg">Watch the demo</a>
+      <span class="note ann" style="font-size:12px;">⌘⇧P · 2.4 MB · Apple Silicon</span>
+    </div>
+
+    <div class="hero-specs">
+      <div class="spec">
+        <div class="label">Context window</div>
+        <div class="val">2M<span class="unit">tokens</span></div>
+        <div class="desc">Full repo indexed locally via AST</div>
+      </div>
+      <div class="spec">
+        <div class="label">Agent latency</div>
+        <div class="val">38<span class="unit">ms</span></div>
+        <div class="desc">First-token, p50, on M-series</div>
+      </div>
+      <div class="spec">
+        <div class="label">Languages</div>
+        <div class="val">47</div>
+        <div class="desc">Native LSP + treesitter</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <!-- Floating agent message -->
+    <div class="float-panel float-agent">
+      <span class="crosshair tl"></span>
+      <div class="head"><span>Agent · Iris</span><span>12:04</span></div>
+      <div class="msg">
+        <span>&gt;</span> Refactoring <code style="color:var(--ink-13);">auth.ts</code> — 4 files touched, tests passing.
+      </div>
+    </div>
+
+    <div class="editor">
+      <div class="editor-chrome">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="tabs">
+          <div class="tab active">auth.ts <span class="x">×</span></div>
+          <div class="tab">session.ts</div>
+          <div class="tab">middleware.ts</div>
+        </div>
+        <div class="editor-path mono">src <span class="sep">/</span> server <span class="sep">/</span> auth.ts</div>
+      </div>
+      <div class="editor-body">
+        <div class="gutter mono">
+          <div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div>
+          <div>20</div><div>21</div><div>22</div><div>23</div><div>24</div><div>25</div>
+          <div>26</div><div>27</div>
+        </div>
+        <div class="code mono">
+<div class="ln"><span class="c">// verify the token against the revocation list</span></div>
+<div class="ln"><span class="k">export async function</span> <span class="f">verifyToken</span><span class="p">(</span>token<span class="p">:</span> <span class="n">string</span><span class="p">)</span> <span class="p">{</span></div>
+<div class="ln">  <span class="k">const</span> claims <span class="p">=</span> <span class="k">await</span> <span class="f">decode</span><span class="p">(</span>token<span class="p">)</span></div>
+<div class="ln">  <span class="k">if</span> <span class="p">(</span><span class="p">!</span>claims<span class="p">)</span> <span class="k">return</span> <span class="n">null</span></div>
+<div class="ln">  <span class="k">const</span> revoked <span class="p">=</span> <span class="k">await</span> redis<span class="p">.</span><span class="f">sismember</span><span class="p">(</span></div>
+<div class="ln">    <span class="s">"revoked:tokens"</span><span class="p">,</span> claims<span class="p">.</span>jti</div>
+<div class="ln">  <span class="p">)</span></div>
+<div class="ln">  <span class="k">if</span> <span class="p">(</span>revoked<span class="p">)</span> <span class="k">return</span> <span class="n">null</span></div>
+<div class="ln"> </div>
+<div class="ln">  <span class="c">// ensure the session is still active</span></div>
+<div class="ln">  <span class="k">const</span> session <span class="p">=</span> <span class="k">await</span> <span class="ghost"><span class="f">getSession</span><span class="p">(</span>claims<span class="p">.</span>sub<span class="p">)</span></span><span class="caret"></span></div>
+<div class="ln">  <span class="k">if</span> <span class="p">(</span><span class="p">!</span>session<span class="p">.</span>active<span class="p">)</span> <span class="k">return</span> <span class="n">null</span></div>
+<div class="ln">  <span class="k">return</span> <span class="p">{</span> userId<span class="p">:</span> claims<span class="p">.</span>sub<span class="p">,</span> session <span class="p">}</span></div>
+<div class="ln"><span class="p">}</span></div>
+        </div>
+      </div>
+      <div class="editor-foot">
+        <div class="left">
+          <span>main <strong>↑2</strong></span>
+          <span>typescript</span>
+          <span>utf-8 / lf</span>
+          <span>ln <strong>24</strong>, col <strong>42</strong></span>
+        </div>
+        <div class="right">
+          <span class="agent-badge"><span class="dotb"></span> Agent live</span>
+          <span>⌘K</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating diff -->
+    <div class="float-panel float-diff">
+      <span class="crosshair br"></span>
+      <div class="row rem"><span class="sign">-</span><span class="code-t">if (!session) return null</span></div>
+      <div class="row add"><span class="sign">+</span><span class="code-t">if (!session.active) return null</span></div>
+      <div class="row add"><span class="sign">+</span><span class="code-t">&nbsp;</span></div>
+      <div style="margin-top:6px; font-size:10px; color:var(--ink-7); letter-spacing:.05em;">
+        4 files · 12 ins · 3 del · tests ✓
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LOGO BAR ============ -->
+<section class="logobar">
+  <div class="logobar-inner">
+    <div class="logobar-label"><i>02 /</i> Trusted by engineering teams at</div>
+    <div class="logos">
+      <span>Lattice</span>
+      <span>Meridian</span>
+      <span>Halcyon</span>
+      <span>Quanta&nbsp;/&nbsp;Labs</span>
+      <span>Northwind</span>
+      <span>Axiom</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BENTO ============ -->
+<section class="section" id="features">
+  <div class="sec-head">
+    <div class="sec-idx">03</div>
+    <h2 class="sec-title">Built for the way you actually ship. <em>Not for the demo.</em></h2>
+    <div class="sec-meta">Features<br>§03.01 — 03.07</div>
+  </div>
+
+  <div class="bento">
+    <!-- A: Agent chat -->
+    <div class="cell cA">
+      <div class="cA-head">
+        <div class="tag"><span class="num">03.01</span> · Persistent Agent</div>
+        <h3>An agent that lives inside your repo.</h3>
+        <p>Iris keeps a warm context of every file, branch, and PR. Ask it to plan, refactor, or ship — then get back to writing.</p>
+      </div>
+      <div class="cA-chat">
+        <div class="chat-row user"><span class="who">›</span><span class="text">migrate auth to session cookies, keep JWT fallback for mobile</span></div>
+        <div class="chat-row agent"><span class="who">★</span><span class="text">Planned. Touching <code>auth.ts</code>, <code>middleware.ts</code>, <code>mobile/api.ts</code>. Running tests in sandbox #4.</span></div>
+        <div class="chat-row user"><span class="who">›</span><span class="text">also update the client hook</span></div>
+        <div class="chat-row agent"><span class="who">★</span><span class="text">Added <code>useSession</code>. 3 call sites migrated. Awaiting review on diff <code>#f4a2</code>.</span></div>
+        <div class="cA-scrim"></div>
+      </div>
+    </div>
+
+    <!-- B: Predictive -->
+    <div class="cell cB">
+      <div class="tag"><span class="num">03.02</span> · Predict</div>
+      <h3>Edits before you type them.</h3>
+      <p>Multi-line, multi-cursor, multi-file completions — trained on your codebase's own patterns.</p>
+      <div class="pred-vis">
+        <div>const user = await db.user.findFirst({</div>
+        <div>&nbsp;&nbsp;where: <span class="ghost2">{ email: input.email }</span><span class="cursor"></span></div>
+        <div>})</div>
+      </div>
+    </div>
+
+    <!-- C: Terminal -->
+    <div class="cell cC">
+      <div class="tag"><span class="num">03.03</span> · Terminal</div>
+      <h3>A shell that speaks English.</h3>
+      <p>Describe what you want. Frontier writes, runs, and explains the command — rolling back if anything smells off.</p>
+      <div class="term">
+        <div><span class="prompt">~/frontier $</span> <span style="color:var(--ink-13);">deploy staging, skip migrations</span></div>
+        <div class="dim">→ resolved: <span style="color:var(--ink-11);">fly deploy --app frontier-staging --skip-migrations</span></div>
+        <div><span class="ok">✓</span> build · 14.2s</div>
+        <div><span class="ok">✓</span> push · 3 regions</div>
+        <div>health · <span class="bar"></span></div>
+      </div>
+    </div>
+
+    <!-- D: KPI latency -->
+    <div class="cell cD kpi">
+      <div class="tag"><span class="num">03.04</span> · Speed</div>
+      <div class="big">38<span class="u">ms</span></div>
+      <div class="caption">First-token latency, p50. Runs on-device via a distilled model — no cloud round-trip.</div>
+    </div>
+
+    <!-- E: KPI privacy -->
+    <div class="cell cE kpi">
+      <div class="tag"><span class="num">03.05</span> · Privacy</div>
+      <div class="big">0<span class="u">bytes</span></div>
+      <div class="caption">Egress in local mode. SOC 2 Type II, EU-resident, SSO, VPC peering on enterprise.</div>
+    </div>
+
+    <!-- F: Multi-file -->
+    <div class="cell cF">
+      <div class="tag"><span class="num">03.06</span> · Refactor</div>
+      <h3>Rewrite across every file at once.</h3>
+      <p>Frontier holds the whole dependency graph in memory. One instruction, coherent changes.</p>
+      <div class="files">
+        <div class="file-row active"><span class="path">src/server/<span style="color:var(--ink-13);">auth.ts</span></span><span class="diff"><span class="plus">+14</span> <span class="minus">−3</span></span><span class="tick">✓</span></div>
+        <div class="file-row"><span class="path">src/server/<span style="color:var(--ink-13);">middleware.ts</span></span><span class="diff"><span class="plus">+6</span> <span class="minus">−2</span></span><span class="tick">✓</span></div>
+        <div class="file-row"><span class="path">src/client/hooks/<span style="color:var(--ink-13);">useSession.ts</span></span><span class="diff"><span class="plus">+22</span> <span class="minus">−0</span></span><span class="tick">✓</span></div>
+        <div class="file-row"><span class="path">mobile/<span style="color:var(--ink-13);">api.ts</span></span><span class="diff"><span class="plus">+4</span> <span class="minus">−8</span></span><span class="tick">✓</span></div>
+        <div class="file-row"><span class="path">tests/<span style="color:var(--ink-13);">auth.spec.ts</span></span><span class="diff"><span class="plus">+18</span> <span class="minus">−1</span></span><span class="tick">…</span></div>
+      </div>
+    </div>
+
+    <!-- G: Graph -->
+    <div class="cell cG">
+      <div class="tag"><span class="num">03.07</span> · Index</div>
+      <h3>Your codebase, as a graph.</h3>
+      <p>Symbol-level retrieval — not vector soup. Ask for a caller and get the caller, not a similar-sounding one.</p>
+      <div class="graph">
+        <svg viewBox="0 0 400 140" preserveAspectRatio="none">
+          <g stroke="#3A3F48" stroke-width="1" fill="none">
+            <line x1="60"  y1="90" x2="160" y2="40"/>
+            <line x1="60"  y1="90" x2="160" y2="90"/>
+            <line x1="60"  y1="90" x2="160" y2="120"/>
+            <line x1="160" y1="40" x2="260" y2="60"/>
+            <line x1="160" y1="90" x2="260" y2="60"/>
+            <line x1="160" y1="120" x2="260" y2="110"/>
+            <line x1="260" y1="60" x2="340" y2="70"/>
+            <line x1="260" y1="110" x2="340" y2="70"/>
+          </g>
+          <g fill="#E8EAED">
+            <circle cx="60" cy="90" r="4"/>
+            <circle cx="160" cy="40" r="3"/>
+            <circle cx="160" cy="90" r="3"/>
+            <circle cx="160" cy="120" r="3"/>
+            <circle cx="260" cy="60" r="3"/>
+            <circle cx="260" cy="110" r="3"/>
+            <circle cx="340" cy="70" r="5"/>
+          </g>
+        </svg>
+        <div class="lbl" style="left: 6%; top: 58%;">verifyToken</div>
+        <div class="lbl" style="left: 38%; top: 20%;">decode()</div>
+        <div class="lbl" style="left: 38%; top: 78%;">redis.sismember</div>
+        <div class="lbl" style="right: 6%; top: 42%;">getSession</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COMPARE ============ -->
+<div class="strip">
+  <section class="compare">
+    <div class="side old">
+      <span class="ann">04.A / Yesterday's editor</span>
+      <h4>Autocomplete that completes the word.</h4>
+      <ul>
+        <li><span class="mark">—</span> Copy / paste between tabs and a chat pane</li>
+        <li><span class="mark">—</span> One-file context, vector search guessing neighbors</li>
+        <li><span class="mark">—</span> Plugins fighting for your keybindings</li>
+        <li><span class="mark">—</span> Agents that forget by lunch</li>
+        <li><span class="mark">—</span> 2-second spinners on every suggestion</li>
+      </ul>
+    </div>
+    <div class="side new">
+      <span class="ann">04.B / Frontier</span>
+      <h4>A collaborator that finishes the thought.</h4>
+      <ul>
+        <li><span class="mark">+</span> Persistent agent with whole-repo awareness</li>
+        <li><span class="mark">+</span> Symbol graph indexed locally, not vector soup</li>
+        <li><span class="mark">+</span> One keybinding surface, first-principle design</li>
+        <li><span class="mark">+</span> Warm context across sessions, PRs, and branches</li>
+        <li><span class="mark">+</span> 38ms median, on-device — no spinner</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<!-- ============ QUOTES ============ -->
+<section class="section" id="quotes">
+  <div class="sec-head">
+    <div class="sec-idx">05</div>
+    <h2 class="sec-title">Shipped by the engineers you'd want on your team. <em>Quietly.</em></h2>
+    <div class="sec-meta">Testimonials<br>§05.01 — 05.03</div>
+  </div>
+
+  <div class="quotes">
+    <div class="quote">
+      <div class="q">I stopped switching between the editor and a chat window. The agent just lives in the buffer now. It's the first tool that actually got out of the way.</div>
+      <div class="who">
+        <div class="av"></div>
+        <div>
+          <div class="n">Mira Vance</div>
+          <div class="r">Staff Eng · Lattice</div>
+        </div>
+      </div>
+    </div>
+    <div class="quote">
+      <div class="q">We shipped a two-week migration in a weekend. What used to be a Jira-tree of refactors collapsed into three prompts and a review pass.</div>
+      <div class="who">
+        <div class="av"></div>
+        <div>
+          <div class="n">Daniel Ostrowski</div>
+          <div class="r">Eng Lead · Halcyon</div>
+        </div>
+      </div>
+    </div>
+    <div class="quote">
+      <div class="q">The index is the story. Symbol-level retrieval means I actually trust the edits. I haven't read a diff this carefully in years — and it's been right.</div>
+      <div class="who">
+        <div class="av"></div>
+        <div>
+          <div class="n">Priya Shankar</div>
+          <div class="r">Principal · Axiom</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section class="section" id="pricing">
+  <div class="sec-head">
+    <div class="sec-idx">06</div>
+    <h2 class="sec-title">Priced for teams that ship. <em>Not for the pilot program.</em></h2>
+    <div class="sec-meta">Pricing<br>Annual · billed yearly</div>
+  </div>
+
+  <div class="price-grid">
+    <div class="price">
+      <div class="name">Solo</div>
+      <div class="amt"><span class="currency">$</span><span class="num">0</span><span class="per">/mo · forever</span></div>
+      <div class="desc">Everything you need as an individual dev. No card required.</div>
+      <ul>
+        <li class="on"><span class="chk">✓</span> Persistent agent · 8k context</li>
+        <li class="on"><span class="chk">✓</span> On-device prediction</li>
+        <li class="on"><span class="chk">✓</span> Unlimited local repos</li>
+        <li class="off"><span class="chk">○</span> Team sync</li>
+        <li class="off"><span class="chk">○</span> SSO / SCIM</li>
+      </ul>
+      <a href="#" class="btn btn-outline cta">Download Frontier</a>
+    </div>
+
+    <div class="price featured">
+      <div class="name">Pro <span class="badge ann">Most picked</span></div>
+      <div class="amt"><span class="currency">$</span><span class="num">24</span><span class="per">/user/mo</span></div>
+      <div class="desc">For teams that want the full agent loop, shared context, and priority models.</div>
+      <ul>
+        <li class="on"><span class="chk">✓</span> Everything in Solo</li>
+        <li class="on"><span class="chk">✓</span> 2M-token repo context</li>
+        <li class="on"><span class="chk">✓</span> Shared agent memory</li>
+        <li class="on"><span class="chk">✓</span> PR authoring + review</li>
+        <li class="on"><span class="chk">✓</span> Cloud sandboxes · 40h/mo</li>
+      </ul>
+      <a href="#" class="btn btn-primary cta">Start a 14-day trial</a>
+    </div>
+
+    <div class="price">
+      <div class="name">Enterprise</div>
+      <div class="amt"><span class="num" style="font-size:32px; letter-spacing:-0.02em;">Let's talk</span></div>
+      <div class="desc">Air-gapped deployments, custom models, dedicated solutions eng.</div>
+      <ul>
+        <li class="on"><span class="chk">✓</span> Everything in Pro</li>
+        <li class="on"><span class="chk">✓</span> SSO · SCIM · Audit logs</li>
+        <li class="on"><span class="chk">✓</span> VPC / on-prem deploy</li>
+        <li class="on"><span class="chk">✓</span> Custom fine-tunes</li>
+        <li class="on"><span class="chk">✓</span> 99.95% SLA</li>
+      </ul>
+      <a href="#" class="btn btn-outline cta">Contact sales</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section" id="faq">
+  <div class="sec-head">
+    <div class="sec-idx">07</div>
+    <h2 class="sec-title">Things you'll ask <em>before you download.</em></h2>
+    <div class="sec-meta">FAQ<br>§07.01 — 07.06</div>
+  </div>
+
+  <div class="faq">
+    <div>
+      <p style="color: var(--ink-9); font-size: 14px; max-width: 260px; line-height: 1.55;">Didn't find what you needed? Ping us — our team answers in the same channel as our engineers.</p>
+      <div style="margin-top: 20px;"><a href="#" class="btn btn-outline">Talk to an engineer →</a></div>
+    </div>
+    <div class="faq-items" id="faqItems">
+      <div class="faq-item open">
+        <div class="n">07.01</div>
+        <div>
+          <div class="q">Does my code leave my machine?</div>
+          <div class="a">In local mode, no. The model runs on-device and the index stays on your disk. Cloud mode routes through our EU/US regions with customer-managed keys — but you choose per-project.</div>
+        </div>
+        <div class="plus"></div>
+      </div>
+      <div class="faq-item">
+        <div class="n">07.02</div>
+        <div>
+          <div class="q">Which editors does it replace?</div>
+          <div class="a">Frontier is a standalone editor. It imports your VS Code keybindings, settings, and extensions on first launch.</div>
+        </div>
+        <div class="plus"></div>
+      </div>
+      <div class="faq-item">
+        <div class="n">07.03</div>
+        <div>
+          <div class="q">What languages are supported?</div>
+          <div class="a">47 languages via native LSP and treesitter. First-class support for TypeScript, Rust, Go, Python, Swift, Kotlin. Others are added monthly.</div>
+        </div>
+        <div class="plus"></div>
+      </div>
+      <div class="faq-item">
+        <div class="n">07.04</div>
+        <div>
+          <div class="q">Can I bring my own model?</div>
+          <div class="a">Yes. Any OpenAI-compatible endpoint works. Enterprise plans support fine-tuned Frontier models hosted in your VPC.</div>
+        </div>
+        <div class="plus"></div>
+      </div>
+      <div class="faq-item">
+        <div class="n">07.05</div>
+        <div>
+          <div class="q">How is this different from an extension?</div>
+          <div class="a">We built the whole editor around the agent loop — not bolted on. The indexer, UI, keybindings, and diff format are designed together, which is why latency lands at 38ms.</div>
+        </div>
+        <div class="plus"></div>
+      </div>
+      <div class="faq-item">
+        <div class="n">07.06</div>
+        <div>
+          <div class="q">When is Windows / Linux?</div>
+          <div class="a">Linux is in public beta. Windows ships Q3. Sign up for the waitlist and we'll email once your platform's build lands.</div>
+        </div>
+        <div class="plus"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="cta-block">
+  <span class="ann">08 / Start</span>
+  <h2>Stop typing.<br><em>Start shipping.</em></h2>
+  <div class="ctas">
+    <a href="#" class="btn btn-primary btn-lg">Download for macOS</a>
+    <a href="#" class="btn btn-ghost btn-lg">Read the manifesto</a>
+  </div>
+  <div class="fine">2.4 MB · Apple Silicon · signed · notarized · Linux beta · Windows Q3</div>
+
+  <div class="big-word">FRONTIER</div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="foot-top">
+    <div class="about">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <span>Frontier</span>
+      </div>
+      <p>A keyboard-first, AI-native IDE. Built in San Francisco and Berlin by a small team of editor nerds and systems engineers.</p>
+    </div>
+    <div>
+      <h5>Product</h5>
+      <ul>
+        <li><a href="#">Download</a></li>
+        <li><a href="#">Features</a></li>
+        <li><a href="#">Pricing</a></li>
+        <li><a href="#">Changelog</a></li>
+        <li><a href="#">Status</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Docs</h5>
+      <ul>
+        <li><a href="#">Quickstart</a></li>
+        <li><a href="#">Agent API</a></li>
+        <li><a href="#">Keybindings</a></li>
+        <li><a href="#">Self-hosting</a></li>
+        <li><a href="#">Security</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Company</h5>
+      <ul>
+        <li><a href="#">Manifesto</a></li>
+        <li><a href="#">Careers · 6</a></li>
+        <li><a href="#">Brand</a></li>
+        <li><a href="#">Press</a></li>
+        <li><a href="#">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Legal</h5>
+      <ul>
+        <li><a href="#">Privacy</a></li>
+        <li><a href="#">Terms</a></li>
+        <li><a href="#">DPA</a></li>
+        <li><a href="#">SOC 2</a></li>
+        <li><a href="#">Sub-processors</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <div>© 2026 Frontier Systems, Inc.</div>
+    <div>v0.24.3 · build 2026.04.18</div>
+    <div class="r">Made in SF / BER · <span class="pulse" style="display:inline-block;vertical-align:middle;"></span> systems nominal</div>
+  </div>
+</footer>
+
+</div>
+
+<!-- ============ TWEAKS PANEL ============ -->
+<div class="tweaks" id="tweaks">
+  <div class="h"><span>Tweaks</span><span class="dotg"></span></div>
+  <div class="b">
+    <label>Hero layout <span class="val" id="vHero">asymmetric</span>
+      <div class="tweak-options" data-key="hero">
+        <div class="tweak-opt sel" data-val="asymmetric">Asym 7/5</div>
+        <div class="tweak-opt" data-val="centered">Centered</div>
+      </div>
+    </label>
+    <label>Tone <span class="val" id="vTone">default</span>
+      <div class="tweak-options" data-key="tone">
+        <div class="tweak-opt sel" data-val="default">Default</div>
+        <div class="tweak-opt" data-val="frost">Frost</div>
+        <div class="tweak-opt" data-val="graphite">Graphite</div>
+        <div class="tweak-opt" data-val="obsidian">Obsidian</div>
+      </div>
+    </label>
+    <label>Density <span class="val" id="vDensity">normal</span>
+      <div class="tweak-options" data-key="density">
+        <div class="tweak-opt" data-val="compact">Compact</div>
+        <div class="tweak-opt sel" data-val="normal">Normal</div>
+        <div class="tweak-opt" data-val="spacious">Spacious</div>
+      </div>
+    </label>
+    <label>Corners <span class="val" id="vCorners">round</span>
+      <div class="tweak-options" data-key="corners">
+        <div class="tweak-opt sel" data-val="round">Round 6px</div>
+        <div class="tweak-opt" data-val="sharp">Sharp</div>
+      </div>
+    </label>
+  </div>
+</div>
+
+<script>
+  const TWEAK_DEFAULS = /*EDITMODE-BEGIN*/{
+    "hero": "asymmetric",
+    "tone": "default",
+    "density": "normal",
+    "corners": "round"
+  }/*EDITMODE-END*/;
+
+  // Apply defaults
+  (function(){
+    const b = document.body;
+    Object.entries(TWEAK_DEFAULS).forEach(([k,v]) => b.setAttribute('data-'+k, v));
+    document.querySelectorAll('.tweaks .tweak-options').forEach(grp => {
+      const k = grp.dataset.key;
+      grp.querySelectorAll('.tweak-opt').forEach(o => {
+        o.classList.toggle('sel', o.dataset.val === TWEAK_DEFAULS[k]);
+      });
+      const vEl = document.getElementById('v'+k[0].toUpperCase()+k.slice(1));
+      if (vEl) vEl.textContent = TWEAK_DEFAULS[k];
+    });
+  })();
+
+  // FAQ toggle
+  document.getElementById('faqItems').addEventListener('click', (e) => {
+    const item = e.target.closest('.faq-item');
+    if (!item) return;
+    item.classList.toggle('open');
+  });
+
+  // Tweaks wiring
+  const tw = document.getElementById('tweaks');
+  document.querySelectorAll('.tweaks .tweak-options').forEach(grp => {
+    grp.addEventListener('click', (e) => {
+      const opt = e.target.closest('.tweak-opt');
+      if (!opt) return;
+      const k = grp.dataset.key;
+      const v = opt.dataset.val;
+      grp.querySelectorAll('.tweak-opt').forEach(o => o.classList.toggle('sel', o === opt));
+      document.body.setAttribute('data-'+k, v);
+      const vEl = document.getElementById('v'+k[0].toUpperCase()+k.slice(1));
+      if (vEl) vEl.textContent = v;
+      window.parent.postMessage({type: '__edit_mode_set_keys', edits: {[k]: v}}, '*');
+    });
+  });
+
+  window.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === '__activate_edit_mode') tw.classList.add('on');
+    if (d.type === '__deactivate_edit_mode') tw.classList.remove('on');
+  });
+  window.parent.postMessage({type: '__edit_mode_available'}, '*');
+</script>
+</body>
+</html>
