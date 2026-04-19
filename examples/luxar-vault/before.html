@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CryptoWallet AI</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #090d1a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #e2e8f0;
+  }
+  .app {
+    width: 420px;
+    background: #0f1629;
+    border-radius: 24px;
+    border: 1px solid rgba(99,102,241,0.2);
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.1);
+  }
+
+  .header {
+    padding: 20px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .brand { font-size: 18px; font-weight: 800; }
+  .brand .accent { color: #818cf8; }
+  .header-actions { display: flex; gap: 8px; }
+  .icon-btn { width: 36px; height: 36px; background: rgba(255,255,255,0.05); border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; }
+
+  .balance-card {
+    margin: 20px;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+    border-radius: 20px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .balance-card::after {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 160px; height: 160px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
+  }
+  .card-label { font-size: 12px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .card-balance { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }
+  .card-sub { margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .card-address { font-size: 11px; color: rgba(255,255,255,0.5); font-family: monospace; }
+  .card-change { font-size: 13px; font-weight: 600; color: #4ade80; background: rgba(74,222,128,0.15); padding: 3px 10px; border-radius: 12px; }
+
+  .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 20px 20px; }
+  .action-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 12px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .action-btn:hover { background: rgba(99,102,241,0.15); }
+  .action-icon { font-size: 20px; margin-bottom: 6px; }
+  .action-label { font-size: 11px; color: #94a3b8; font-weight: 500; }
+
+  .swap-section {
+    margin: 0 20px 20px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .swap-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: flex; justify-content: space-between; }
+  .swap-row { display: flex; align-items: center; gap: 10px; padding: 12px; background: rgba(255,255,255,0.04); border-radius: 12px; margin-bottom: 6px; }
+  .token-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .btc-icon { background: linear-gradient(135deg, #f7931a, #e5720d); }
+  .eth-icon { background: linear-gradient(135deg, #627eea, #3f5ad3); }
+  .token-info { flex: 1; }
+  .token-name { font-size: 14px; font-weight: 600; }
+  .token-bal { font-size: 12px; color: #64748b; }
+  .token-value { text-align: right; }
+  .token-usd { font-size: 14px; font-weight: 700; }
+  .token-change-pos { font-size: 11px; color: #4ade80; }
+  .token-change-neg { font-size: 11px; color: #f87171; }
+  .swap-arrows { text-align: center; margin: 4px 0; color: #818cf8; font-size: 18px; }
+  .swap-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 12px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+
+  .assets { padding: 0 20px 20px; }
+  .assets-header { display: flex; justify-content: space-between; margin-bottom: 12px; }
+  .assets-title { font-size: 14px; font-weight: 600; }
+  .see-all { font-size: 12px; color: #818cf8; }
+  .asset-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .asset-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .sol-icon { background: linear-gradient(135deg, #9945ff, #14f195); }
+  .usdc-icon { background: linear-gradient(135deg, #2775ca, #1a5fa0); }
+  .asset-info { flex: 1; }
+  .asset-name { font-size: 13px; font-weight: 600; }
+  .asset-amount { font-size: 12px; color: #64748b; }
+  .asset-right { text-align: right; }
+  .asset-usd { font-size: 13px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="brand">Crypto<span class="accent">Wallet</span></div>
+    <div class="header-actions">
+      <div class="icon-btn">🔔</div>
+      <div class="icon-btn">⚙️</div>
+    </div>
+  </div>
+
+  <div class="balance-card">
+    <div class="card-label">Total Portfolio Value</div>
+    <div class="card-balance">$48,291.50</div>
+    <div class="card-sub">
+      <div class="card-address">0x4a8f...d291</div>
+      <div class="card-change">↑ +4.2%</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <div class="action-btn"><div class="action-icon">📤</div><div class="action-label">Send</div></div>
+    <div class="action-btn"><div class="action-icon">📥</div><div class="action-label">Receive</div></div>
+    <div class="action-btn"><div class="action-icon">🔄</div><div class="action-label">Swap</div></div>
+    <div class="action-btn"><div class="action-icon">📈</div><div class="action-label">Invest</div></div>
+  </div>
+
+  <div class="swap-section">
+    <div class="swap-label"><span>Quick Swap</span><span style="color:#818cf8">AI Rate</span></div>
+    <div class="swap-row">
+      <div class="token-icon btc-icon">₿</div>
+      <div class="token-info">
+        <div class="token-name">Bitcoin</div>
+        <div class="token-bal">0.42 BTC</div>
+      </div>
+      <div class="token-value">
+        <div class="token-usd">$24,891</div>
+        <div class="token-change-pos">↑ +2.4%</div>
+      </div>
+    </div>
+    <div class="swap-arrows">⇅</div>
+    <div class="swap-row">
+      <div class="token-icon eth-icon">Ξ</div>
+      <div class="token-info">
+        <div class="token-name">Ethereum</div>
+        <div class="token-bal">7.2 ETH</div>
+      </div>
+      <div class="token-value">
+        <div class="token-usd">$18,201</div>
+        <div class="token-change-neg">↓ -0.8%</div>
+      </div>
+    </div>
+    <button class="swap-btn">Swap with AI Optimization ✦</button>
+  </div>
+
+  <div class="assets">
+    <div class="assets-header">
+      <div class="assets-title">All Assets</div>
+      <div class="see-all">See all →</div>
+    </div>
+    <div class="asset-row">
+      <div class="asset-icon sol-icon">◎</div>
+      <div class="asset-info"><div class="asset-name">Solana</div><div class="asset-amount">42.5 SOL</div></div>
+      <div class="asset-right"><div class="asset-usd">$3,612</div><div class="token-change-pos">↑ +8.1%</div></div>
+    </div>
+    <div class="asset-row">
+      <div class="asset-icon usdc-icon">$</div>
+      <div class="asset-info"><div class="asset-name">USD Coin</div><div class="asset-amount">1,587 USDC</div></div>
+      <div class="asset-right"><div class="asset-usd">$1,587</div><div style="font-size:11px;color:#64748b">stable</div></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

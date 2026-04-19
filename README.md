@@ -62,19 +62,35 @@ The AI doesn't guess. It executes.
 
 ## Before / After
 
+![AeroDrop comparison](examples/aerodrop/comparison.png)
+
+`claude "build me an autonomous AI delivery app, dark theme"` vs `npx handoff-cdn use aerodrop | claude`
+
+**What changed:** Blue gradient background → `oklch(0.09 0.04 260)` deep glass wash. Generic phone frame → exact iOS hardware proportions. `border-radius: 44px` rounded cards → glass panels with `backdrop-filter: blur(16px) saturate(140%)`. `#3b82f6` blue → oklch-based glass strokes. Emoji drone → 3D isometric path visualization.
+
+---
+
+![Luxar Vault comparison](examples/luxar-vault/comparison.png)
+
+`claude "build me an AI crypto wallet, dark theme"` vs `npx handoff-cdn use luxar-vault | claude`
+
+**What changed:** Purple gradient card → iridescent holographic glass with oklch hue shift. `linear-gradient(135deg, #6366f1...)` → `oklch` radial wash. Generic rounded swap interface → holographic Smart Swap with risk slider that retints the entire UI. `#4ade80` green → oklch-calibrated glass accent.
+
+---
+
 ![Agentic Ops comparison](examples/agentic-ops/comparison.png)
 
 `claude "build me an AI agent monitoring dashboard, dark theme"` vs `npx handoff-cdn use agentic-ops | claude`
 
-**What changed:** `#0f0f23` → `#0a0b0c`. `#22c55e` → `#00b872`. `border-radius: 12px` → `≤4px`. `box-shadow` → removed. System font → Chakra Petch. Emoji icons → monospace text. Generic sidebar → 4px baseline grid.
+**What changed:** `#0f0f23` → `#0a0b0c`. `#22c55e` → `#00b872`. `border-radius: 12px` → `≤4px`. `box-shadow` → removed. System font → Chakra Petch. Emoji icons → monospace text. 3D force-directed agent graph added.
 
 ---
 
 ![NeuralStore comparison](examples/neuralstore/comparison.png)
 
-`claude "build me an AI e-commerce store, dark theme"` vs `npx handoff-cdn use neuralstore | claude`
+`claude "build me an AI e-commerce store"` vs `npx handoff-cdn use neuralstore | claude`
 
-**What changed:** Purple gradient hero → white/black Swiss grid. Rounded product cards → hairline-bordered flat cells. `#6366f1` accent → no accent (Monochrome). Emoji product images → structured placeholder grid. Generic chat widget → ATLAS panel with session ID, exact typography.
+**What changed:** Purple gradient hero → stark white/black Swiss editorial grid. Rounded cards → hairline-bordered flat cells. `#6366f1` → no accent (Monochrome spec). Generic chat bubble → ATLAS AI panel with session ID and typed prompts.
 
 ---
 
