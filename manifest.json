@@ -11,9 +11,10 @@
     {
       "slug": "aerodrop",
       "title": "AeroDrop — Autonomous AI Delivery",
+      "description": "Premium mobile UI for an autonomous AI delivery app. Obsidian Liquid Glass aesthetic: 3D isometric pathfinding map with animated flight path, AI agent status card with glowing pulse effects and cycling telemetry phases (PATHFINDING→SCANNING→COORDINATING), dual glass sliders for Priority and Stealth Mode. Design tokens in tokens.css. Follows Apple HIG 2026.",
       "family": "Liquid Glass",
       "fidelity": 99,
-      "tags": ["mobile", "delivery", "ios-frame", "react", "elite"],
+      "tags": ["mobile", "delivery", "ios-frame", "react", "elite", "sliders", "map"],
       "dir": "bundles/aerodrop-luxury-ui",
       "primary": "project/AeroDrop.html",
       "chat": "chats/chat1.md",
@@ -23,9 +24,10 @@
     {
       "slug": "agentic-ops",
       "title": "Agentic Ops — Swarm Console",
+      "description": "Futuristic desktop dashboard for monitoring 50+ autonomous AI agents. Cyber-Minimalism: mono-chromatic silver palette, sharp 4px corners, real 3D force-directed graph (Fruchterman-Reingold, auto-rotating, depth fog), custom radial knobs for Reasoning Depth and Token Budget. Typography: Chakra Petch with wide letter-spacing + JetBrains Mono for telemetry.",
       "family": "Monochrome",
       "fidelity": 97,
-      "tags": ["dashboard", "swarm", "terminal", "monochrome", "elite"],
+      "tags": ["dashboard", "swarm", "desktop", "terminal", "monochrome", "elite", "knobs", "3d-graph"],
       "dir": "bundles/agentic-ops",
       "primary": "project/Agentic Ops.html",
       "chat": "chats/chat1.md",
@@ -35,6 +37,7 @@
     {
       "slug": "biopulse",
       "title": "BioPulse — AI Health Tracker",
+      "description": "AI-powered health tracking mobile UI with liquid glass aesthetic. Animated biometric rings, health score panels, and activity timeline. Deep purple radial wash background, frosted glass cards, neon health indicators.",
       "family": "Liquid Glass",
       "fidelity": 96,
       "tags": ["mobile", "health", "ios-frame", "react"],
@@ -47,9 +50,10 @@
     {
       "slug": "luxar-vault",
       "title": "Luxar Vault — AI Crypto Wallet",
+      "description": "Interactive AI-powered crypto wallet with Holographic Glassmorphism. Iridescent hue shifts (cyan→magenta→violet), deep navy cosmos background, real-time risk analysis slider that retints the entire UI (green→amber→red via CSS custom property), card-based asset list, fuzzy-search bar, and Smart Swap interface with motion-ready buttons. Space Grotesk + JetBrains Mono.",
       "family": "Liquid Glass",
       "fidelity": 98,
-      "tags": ["finance", "wallet", "crypto", "react", "elite"],
+      "tags": ["finance", "wallet", "crypto", "react", "elite", "slider", "glassmorphism"],
       "dir": "bundles/holowallet",
       "primary": "project/Luxar Vault.html",
       "chat": "chats/chat1.md",
@@ -59,6 +63,7 @@
     {
       "slug": "orchestrator",
       "title": "Orchestrator — LogicChain",
+      "description": "AI workflow orchestration dashboard. Monochrome industrial aesthetic: pipeline graph, agent node editor, execution log panel, and status matrix. 4px baseline grid, hairline borders, JetBrains Mono throughout.",
       "family": "Monochrome",
       "fidelity": 95,
       "tags": ["workflow", "graph", "pipeline", "monochrome"],
@@ -71,6 +76,7 @@
     {
       "slug": "neuralstore",
       "title": "NeuralStore — Engineered for Signal",
+      "description": "Editorial e-commerce for precision audio/video hardware. Monochrome light mode: stark white/black grid, JetBrains Mono product codes, AI assistant panel (Atlas), hero typography at display scale. Six instruments, zero noise.",
       "family": "Monochrome",
       "fidelity": 96,
       "tags": ["ecommerce", "light-mode", "editorial", "monochrome"],
@@ -83,9 +89,10 @@
     {
       "slug": "frontier",
       "title": "Frontier — The AI-native IDE",
+      "description": "Landing page for an AI-native code editor. Monochrome dark: editor chrome mockup, feature grid, animated code completion preview, terminal gradient footer. Inter Tight + JetBrains Mono. CTA-optimised layout.",
       "family": "Monochrome",
       "fidelity": 94,
-      "tags": ["ide", "editor", "developer-tool", "monochrome"],
+      "tags": ["ide", "editor", "developer-tool", "monochrome", "landing-page"],
       "dir": "bundles/vibe-design",
       "primary": "project/Frontier Landing.html",
       "chat": "chats/chat1.md",
@@ -95,9 +102,10 @@
     {
       "slug": "visionsynth",
       "title": "VisionSynth — AI Video Generator",
+      "description": "Pro-grade desktop UI for an AI video generator. Bento Grid layout: cinematic preview window with dynamic glow backlighting, multi-track timeline with magnetic snapping, floating style-preset cards, Frame Interpolation and Style Intensity sliders. Instrument Serif editorial typeface + Space Grotesk + JetBrains Mono. Amber gold accent on deep oklch purple.",
       "family": "Liquid Glass",
       "fidelity": 97,
-      "tags": ["video", "timeline", "generator", "react", "elite"],
+      "tags": ["video", "timeline", "bento-grid", "react", "elite", "desktop", "sliders"],
       "dir": "bundles/visionsynth",
       "primary": "project/VisionSynth.html",
       "chat": "chats/chat1.md",
