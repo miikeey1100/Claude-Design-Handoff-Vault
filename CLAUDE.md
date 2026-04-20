@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npx handoff-cdn use aerodrop | claude
 ```
 
-The repo has two roles simultaneously: (1) a CDN of 8 design bundles, and (2) a published CLI that consumers `npx`-run without cloning.
+The repo has two roles simultaneously: (1) a CDN of 14 design bundles, and (2) a published CLI that consumers `npx`-run without cloning.
 
 ---
 
@@ -20,7 +20,7 @@ The repo has two roles simultaneously: (1) a CDN of 8 design bundles, and (2) a 
 
 ```bash
 npm run setup      # npm install + npx playwright install chromium
-npm run capture    # Playwright: render all 8 bundles → previews/<slug>.png
+npm run capture    # Playwright: render all 14 bundles → previews/<slug>.png
 npm run compare    # Playwright: render + inject fidelity badge → previews/comparisons/<slug>.png
 
 node bin/handoff-cdn.js --help
@@ -55,7 +55,7 @@ Both `bin/handoff-cdn.js` and `scripts/compare.mjs` read `manifest.json` at runt
 
 Bundles that load JSX via Babel standalone (`aerodrop`, `holowallet`, `visionsynth`) cannot be served from `file://` — Babel can't `fetch()` sibling files cross-origin. Both capture scripts boot a throwaway `node:http` server on a random port, serve `bundles/` from it, then shut down. This is the only reason the server exists; do not remove it.
 
-### Bundle structure (each of 8 bundles)
+### Bundle structure (each of 14 bundles)
 
 ```
 bundles/<slug>/
@@ -72,8 +72,8 @@ Every bundle belongs to exactly one family. The family is declared in `manifest.
 
 | Family | Bundles | Key rule |
 |---|---|---|
-| **Liquid Glass** | aerodrop, biopulse, luxar-vault, visionsynth | oklch surfaces, `backdrop-filter: blur(16px) saturate(140%)`, radius 10–32px |
-| **Monochrome** | agentic-ops, orchestrator, neuralstore, frontier | #0a0b0c base, 4px baseline grid, radius ≤ 6px, one accent `#00b872` |
+| **Liquid Glass** | aerodrop, biopulse, luxar-vault, visionsynth, spectra-chat, crystalpay, auroramail | oklch surfaces, `backdrop-filter: blur(16px) saturate(140%)`, radius 10–32px |
+| **Monochrome** | agentic-ops, orchestrator, neuralstore, frontier, tradepulse, shiptrack, sentrygrid | #0a0b0c base, 4px baseline grid, radius ≤ 6px, one accent `#00b872` |
 
 ---
 

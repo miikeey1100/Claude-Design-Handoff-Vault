@@ -49,7 +49,7 @@ Sleep 500ms
 Enter
 Sleep 2s
 
-# output appears — 8 bundles with families
+# output appears — 14 bundles with families
 Sleep 3s
 
 # ── Act 3: The command ──────────────────────────────────────────
