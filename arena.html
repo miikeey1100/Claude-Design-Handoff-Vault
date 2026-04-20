@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Handoff-CDN Arena — Opus 4.7 vs Opus 4.7 + Handoff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-0:     oklch(0.09 0.04 260);
+    --bg-1:     oklch(0.12 0.02 270);
+    --panel:    oklch(1 0 0 / 0.04);
+    --panel-hi: oklch(1 0 0 / 0.08);
+    --stroke:   oklch(1 0 0 / 0.10);
+    --stroke-hi: oklch(1 0 0 / 0.18);
+    --ink-100:  oklch(0.97 0.005 80);
+    --ink-70:   oklch(0.78 0.008 80);
+    --ink-50:   oklch(0.58 0.010 80);
+    --accent:   oklch(0.85 0.14 80);
+    --good:     oklch(0.78 0.14 145);
+    --bad:      oklch(0.65 0.18 25);
+    --mono:     "JetBrains Mono", ui-monospace, monospace;
+    --display:  "Space Grotesk", system-ui, sans-serif;
+    --blur:     blur(16px) saturate(140%);
+    --r-sm:     10px;
+    --r-md:     16px;
+    --r-lg:     24px;
+  }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(100% 60% at 20% 10%, oklch(0.18 0.08 280) 0%, transparent 60%),
+      radial-gradient(100% 60% at 80% 0%, oklch(0.15 0.08 20) 0%, transparent 60%),
+      var(--bg-0);
+    color: var(--ink-100);
+    font-family: var(--display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--stroke);
+    background: oklch(0 0 0 / 0.3);
+    backdrop-filter: var(--blur);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-weight: 700; letter-spacing: -0.01em; font-size: 17px;
+  }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 16px var(--accent); }
+  .brand em { font-style: normal; color: var(--ink-50); font-weight: 500; }
+  header nav { display: flex; gap: 18px; font-size: 13px; color: var(--ink-70); }
+  header nav a { color: inherit; text-decoration: none; padding: 6px 10px; border-radius: 8px; }
+  header nav a:hover { background: var(--panel); color: var(--ink-100); }
+
+  main { padding: 36px 28px 56px; max-width: 1480px; margin: 0 auto; }
+
+  .hero { text-align: center; margin-bottom: 32px; }
+  .hero h1 { font-size: clamp(28px, 4vw, 48px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.05; margin-bottom: 10px; }
+  .hero h1 span { background: linear-gradient(90deg, var(--accent), oklch(0.75 0.18 20)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p { color: var(--ink-70); font-size: 15px; max-width: 720px; margin: 0 auto; line-height: 1.5; }
+
+  .controls {
+    background: var(--panel);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-lg);
+    backdrop-filter: var(--blur);
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr 220px 180px;
+    gap: 12px;
+    margin-bottom: 24px;
+    align-items: center;
+  }
+  .controls input, .controls select {
+    background: oklch(0 0 0 / 0.4);
+    border: 1px solid var(--stroke);
+    color: var(--ink-100);
+    font: inherit;
+    padding: 14px 16px;
+    border-radius: var(--r-md);
+    font-size: 14px;
+    outline: none;
+    transition: border 0.15s;
+  }
+  .controls input:focus, .controls select:focus { border-color: var(--stroke-hi); }
+  .controls button {
+    background: linear-gradient(180deg, var(--accent), oklch(0.75 0.14 70));
+    border: none;
+    color: oklch(0.15 0.04 60);
+    font-family: var(--display);
+    font-weight: 700;
+    padding: 14px 20px;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    transition: transform 0.1s, box-shadow 0.2s;
+    box-shadow: 0 8px 24px oklch(0.85 0.14 80 / 0.25);
+  }
+  .controls button:hover { transform: translateY(-1px); box-shadow: 0 12px 32px oklch(0.85 0.14 80 / 0.4); }
+  .controls button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .arena {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .lane {
+    background: var(--panel);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-lg);
+    backdrop-filter: var(--blur);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 620px;
+  }
+  .lane-head {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--stroke);
+  }
+  .lane-title { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+  .lane-title .chip { font-family: var(--mono); font-size: 10px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--stroke); background: oklch(0 0 0 / 0.3); color: var(--ink-70); font-weight: 500; letter-spacing: 0.04em; }
+  .lane-title .chip.a { border-color: oklch(0.65 0.18 25 / 0.4); color: oklch(0.78 0.16 30); }
+  .lane-title .chip.b { border-color: oklch(0.75 0.14 145 / 0.4); color: var(--good); }
+  .lane-score {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-50);
+    min-width: 70px;
+    text-align: right;
+  }
+  .lane-score strong { color: var(--ink-100); font-size: 16px; font-weight: 700; }
+
+  .lane-viewport {
+    flex: 1;
+    position: relative;
+    background: oklch(0 0 0 / 0.5);
+    min-height: 500px;
+  }
+  .lane-viewport iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+  .lane-placeholder {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 40px;
+    color: var(--ink-50);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .lane-placeholder .hint { font-family: var(--mono); font-size: 11px; color: var(--ink-50); margin-top: 10px; opacity: 0.6; }
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid var(--stroke);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .report {
+    margin-top: 24px;
+    background: var(--panel);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-lg);
+    backdrop-filter: var(--blur);
+    padding: 20px 24px;
+    display: none;
+  }
+  .report.on { display: block; }
+  .report-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .report-col h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-50); margin-bottom: 10px; font-weight: 600; }
+  .report-col .score { font-family: var(--mono); font-size: 42px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  .report-col .score.a { color: oklch(0.75 0.16 30); }
+  .report-col .score.b { color: var(--good); }
+  .report-col .score small { font-size: 16px; color: var(--ink-50); font-weight: 500; margin-left: 4px; }
+  .report-col .bar { height: 6px; border-radius: 3px; background: var(--stroke); margin: 10px 0; overflow: hidden; }
+  .report-col .bar-fill { height: 100%; transition: width 0.8s ease-out; }
+  .report-col .bar-fill.a { background: oklch(0.75 0.16 30); }
+  .report-col .bar-fill.b { background: var(--good); }
+  .report-col .summary { color: var(--ink-70); font-size: 13px; line-height: 1.5; }
+
+  .delta {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--stroke);
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--ink-70);
+  }
+  .delta strong { color: var(--good); font-size: 20px; font-weight: 700; }
+
+  .examples { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+  .examples button {
+    background: oklch(0 0 0 / 0.3);
+    border: 1px solid var(--stroke);
+    color: var(--ink-70);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--mono);
+    transition: background 0.15s, color 0.15s;
+  }
+  .examples button:hover { background: var(--panel-hi); color: var(--ink-100); }
+
+  footer {
+    margin-top: 48px;
+    padding: 24px 0;
+    text-align: center;
+    color: var(--ink-50);
+    font-size: 12px;
+    border-top: 1px solid var(--stroke);
+  }
+  footer a { color: var(--ink-70); text-decoration: none; }
+  footer a:hover { color: var(--ink-100); }
+
+  @media (max-width: 900px) {
+    .arena { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; }
+    .report-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="dot"></span>Handoff-CDN Arena<em>&nbsp;·&nbsp;live fidelity race</em></div>
+  <nav>
+    <a href="https://github.com/miikeey1100/handoff-cdn" target="_blank">GitHub</a>
+    <a href="https://www.npmjs.com/package/handoff-cdn" target="_blank">npm</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Plain Opus 4.7 <span>vs</span> Opus 4.7 + Handoff-CDN</h1>
+    <p>Type a UI prompt. Two lanes race to build it. Opus 4.7 itself grades both against a Handoff-CDN design contract. The visual delta is the pitch.</p>
+  </section>
+
+  <section class="controls">
+    <input id="prompt" type="text" placeholder='e.g. "a crypto wallet with dark glass and a holographic balance card"' />
+    <select id="bundle">
+      <option value="">Loading bundles…</option>
+    </select>
+    <button id="race">Race →</button>
+  </section>
+
+  <div class="examples">
+    <button data-ex="aerodrop">autonomous AI delivery app</button>
+    <button data-ex="luxar-vault">AI crypto wallet, dark theme</button>
+    <button data-ex="agentic-ops">AI agent monitoring dashboard</button>
+    <button data-ex="neuralstore">AI e-commerce store</button>
+  </div>
+
+  <section class="arena" style="margin-top:24px;">
+    <div class="lane">
+      <div class="lane-head">
+        <div class="lane-title"><span class="chip a">LANE A</span> Plain Opus 4.7</div>
+        <div class="lane-score" id="score-a">—</div>
+      </div>
+      <div class="lane-viewport" id="viewport-a">
+        <div class="lane-placeholder">Awaiting prompt…<div class="hint">just the prompt, no design contract</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-head">
+        <div class="lane-title"><span class="chip b">LANE B</span> Opus 4.7 + Handoff-CDN</div>
+        <div class="lane-score" id="score-b">—</div>
+      </div>
+      <div class="lane-viewport" id="viewport-b">
+        <div class="lane-placeholder">Awaiting prompt…<div class="hint">prompt + design contract + reference bundle</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="report" id="report">
+    <div class="report-row">
+      <div class="report-col">
+        <h3>Lane A · Plain 4.7</h3>
+        <div class="score a"><span id="num-a">0</span><small>/100</small></div>
+        <div class="bar"><div class="bar-fill a" id="bar-a" style="width:0"></div></div>
+        <div class="summary" id="sum-a">—</div>
+      </div>
+      <div class="report-col">
+        <h3>Lane B · 4.7 + Handoff-CDN</h3>
+        <div class="score b"><span id="num-b">0</span><small>/100</small></div>
+        <div class="bar"><div class="bar-fill b" id="bar-b" style="width:0"></div></div>
+        <div class="summary" id="sum-b">—</div>
+      </div>
+    </div>
+    <div class="delta" id="delta">—</div>
+  </section>
+
+  <footer>
+    Built with Opus 4.7 · <a href="https://github.com/miikeey1100/handoff-cdn">miikeey1100/handoff-cdn</a> · MIT
+  </footer>
+</main>
+
+<script>
+const BUNDLES_URL = '/api/bundles';
+const GENERATE_URL = '/api/generate';
+const GRADE_URL = '/api/grade';
+
+const $ = id => document.getElementById(id);
+
+let BUNDLES = [];
+
+async function loadBundles() {
+  const sel = $('bundle');
+  try {
+    const r = await fetch(BUNDLES_URL);
+    const data = await r.json();
+    BUNDLES = data.bundles;
+    sel.innerHTML = '';
+    const glass = BUNDLES.filter(b => b.family === 'Liquid Glass');
+    const mono = BUNDLES.filter(b => b.family === 'Monochrome');
+    const og1 = document.createElement('optgroup'); og1.label = '✦ Liquid Glass';
+    for (const b of glass) { const o = document.createElement('option'); o.value = b.slug; o.textContent = b.slug; og1.appendChild(o); }
+    const og2 = document.createElement('optgroup'); og2.label = '◆ Monochrome';
+    for (const b of mono) { const o = document.createElement('option'); o.value = b.slug; o.textContent = b.slug; og2.appendChild(o); }
+    sel.appendChild(og1); sel.appendChild(og2);
+    sel.value = 'aerodrop';
+  } catch (e) {
+    sel.innerHTML = '<option>no bundles — run: npx handoff-cdn arena</option>';
+  }
+}
+
+function setLaneLoading(which, label) {
+  const v = $('viewport-' + which);
+  v.innerHTML = `<div class="lane-placeholder"><div class="spinner"></div>${label}</div>`;
+}
+
+function setLaneError(which, msg) {
+  const v = $('viewport-' + which);
+  v.innerHTML = `<div class="lane-placeholder" style="color:var(--bad)">${msg}</div>`;
+}
+
+function renderHTML(which, html) {
+  const v = $('viewport-' + which);
+  v.innerHTML = `<iframe sandbox="allow-scripts" srcdoc="${html.replace(/"/g,'&quot;')}"></iframe>`;
+}
+
+async function generate(prompt, slug, withBundle) {
+  const r = await fetch(GENERATE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, slug, withBundle })
+  });
+  if (!r.ok) throw new Error('generate failed: ' + r.status);
+  const data = await r.json();
+  return data.html;
+}
+
+async function grade(html, slug) {
+  const r = await fetch(GRADE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ html, slug })
+  });
+  if (!r.ok) throw new Error('grade failed: ' + r.status);
+  return r.json();
+}
+
+async function race() {
+  const prompt = $('prompt').value.trim();
+  const slug = $('bundle').value;
+  if (!prompt) { $('prompt').focus(); return; }
+  if (!slug) return;
+
+  $('race').disabled = true;
+  $('report').classList.remove('on');
+  $('score-a').textContent = '—';
+  $('score-b').textContent = '—';
+
+  setLaneLoading('a', 'Plain Opus 4.7 generating…');
+  setLaneLoading('b', 'Opus 4.7 + Handoff-CDN generating…');
+
+  // Run both in parallel
+  const [htmlA, htmlB] = await Promise.all([
+    generate(prompt, slug, false).catch(e => { setLaneError('a', e.message); return null; }),
+    generate(prompt, slug, true).catch(e => { setLaneError('b', e.message); return null; }),
+  ]);
+
+  if (htmlA) renderHTML('a', htmlA);
+  if (htmlB) renderHTML('b', htmlB);
+
+  // Grade each
+  $('score-a').innerHTML = '<em style="font-style:normal;color:var(--ink-50);font-size:11px">grading…</em>';
+  $('score-b').innerHTML = '<em style="font-style:normal;color:var(--ink-50);font-size:11px">grading…</em>';
+
+  const [rA, rB] = await Promise.all([
+    htmlA ? grade(htmlA, slug).catch(() => null) : Promise.resolve(null),
+    htmlB ? grade(htmlB, slug).catch(() => null) : Promise.resolve(null),
+  ]);
+
+  if (rA) $('score-a').innerHTML = '<strong>' + rA.score + '</strong> <small>/ 100</small>';
+  if (rB) $('score-b').innerHTML = '<strong>' + rB.score + '</strong> <small>/ 100</small>';
+
+  if (rA && rB) {
+    $('report').classList.add('on');
+    $('num-a').textContent = rA.score;
+    $('num-b').textContent = rB.score;
+    $('bar-a').style.width = rA.score + '%';
+    $('bar-b').style.width = rB.score + '%';
+    $('sum-a').textContent = rA.summary || '';
+    $('sum-b').textContent = rB.summary || '';
+    const delta = rB.score - rA.score;
+    $('delta').innerHTML = delta > 0
+      ? `Handoff-CDN fidelity improvement: <strong>+${delta} points</strong>`
+      : delta === 0
+        ? `Both lanes scored identically.`
+        : `Plain 4.7 scored higher by ${-delta} points (rare — check the bundle).`;
+  }
+  $('race').disabled = false;
+}
+
+document.querySelectorAll('.examples button').forEach(b => {
+  b.onclick = () => {
+    $('prompt').value = b.textContent;
+    $('bundle').value = b.dataset.ex;
+  };
+});
+
+$('race').onclick = race;
+$('prompt').addEventListener('keydown', e => { if (e.key === 'Enter') race(); });
+
+loadBundles();
+</script>
+</body>
+</html>

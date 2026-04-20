@@ -180,6 +180,7 @@ Handoff-CDN — The Design-to-Code Protocol  v${VERSION}
 Powered by Opus 4.7 (requires ANTHROPIC_API_KEY):
   npx handoff-cdn grade <file> --against <slug>    Score UI fidelity vs contract
   npx handoff-cdn forge "<prompt>"                 Generate a new bundle from a prompt
+  npx handoff-cdn arena                            Live split-screen demo: 4.7 vs 4.7+Handoff
 
 Examples:
   npx handoff-cdn use aerodrop | claude
@@ -778,6 +779,116 @@ Output ONLY the JSON. Nothing else.`;
   stdout.write(`  npm run capture && git add bundles/${bundle.slug} previews manifest.json\n`);
   stdout.write(`  git commit -m "forge: ${bundle.slug}" && git push\n\n`);
   exit(0);
+}
+
+// ── arena ─────────────────────────────────────────────────────────────────────
+if (cmd === 'arena') {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    stderr.write('ANTHROPIC_API_KEY required. Get one: https://platform.claude.com/settings/keys\n');
+    exit(1);
+  }
+  const port = Number(process.env.HANDOFF_ARENA_PORT) || 4488;
+  const arenaPath = path.resolve(__dirname, '..', 'arena.html');
+  let arenaHtml;
+  try { arenaHtml = await fs.readFile(arenaPath, 'utf8'); }
+  catch { arenaHtml = await get(`${manifest.cdn}/arena.html`); }
+
+  function json(res, obj, code = 200) {
+    const body = JSON.stringify(obj);
+    res.writeHead(code, {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(body);
+  }
+  function readBody(req) {
+    return new Promise((resolve, reject) => {
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
+        catch (e) { reject(e); }
+      });
+      req.on('error', reject);
+    });
+  }
+  function extractHtml(text) {
+    // model may wrap in ```html ... ``` or return raw HTML
+    const fence = text.match(/```(?:html)?\s*\n([\s\S]*?)\n```/);
+    if (fence) return fence[1];
+    const doc = text.match(/<!DOCTYPE[\s\S]*<\/html>/i);
+    return doc ? doc[0] : text;
+  }
+
+  const server = http.createServer(async (req, res) => {
+    try {
+      if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(arenaHtml);
+      }
+      if (req.method === 'GET' && req.url === '/api/bundles') {
+        return json(res, { bundles: manifest.bundles });
+      }
+      if (req.method === 'POST' && req.url === '/api/generate') {
+        const { prompt, slug, withBundle } = await readBody(req);
+        const b = bySlug[slug];
+        if (!b) return json(res, { error: 'unknown slug' }, 400);
+        let system, user;
+        if (withBundle) {
+          const refHtml = await get(`${manifest.cdn}/${b.dir}/${b.primary}`).catch(() => '');
+          system = `You implement UI from a Handoff-CDN design contract. Return ONE complete self-contained HTML document (<!DOCTYPE html>...</html>). No preamble, no explanation, just the HTML. Inline CSS, real content, no placeholders. Match every token from the contract. Family: ${b.family}. Never convert oklch() to hex.`;
+          user = `## Token contract (${b.family}):\n${TOKENS[b.family]}\n\n## Reference implementation (style to match):\n\`\`\`\n${refHtml.slice(0, 10000)}\n\`\`\`\n\n## Build this:\n${prompt}\n\nOutput the complete HTML document now.`;
+        } else {
+          system = `You build UIs from plain-English prompts. Return ONE complete self-contained HTML document (<!DOCTYPE html>...</html>). No preamble, just the HTML. Inline CSS, real content.`;
+          user = `Build this: ${prompt}`;
+        }
+        try {
+          const out = await callAnthropic({ system, user, maxTokens: 12000 });
+          return json(res, { html: extractHtml(out) });
+        } catch (e) { return json(res, { error: e.message }, 500); }
+      }
+      if (req.method === 'POST' && req.url === '/api/grade') {
+        const { html, slug } = await readBody(req);
+        const b = bySlug[slug];
+        if (!b) return json(res, { error: 'unknown slug' }, 400);
+        const refHtml = await get(`${manifest.cdn}/${b.dir}/${b.primary}`).catch(() => '');
+        const system = `You grade UI fidelity against a Handoff-CDN contract. Return STRICTLY VALID JSON (no preamble): {"score": <0-100>, "summary": "one sentence"}. Scoring rubric: -8 per oklch→hex conversion; -10 if Liquid Glass missing backdrop-filter; -6 per over-radius; -3 per non-4px spacing on Monochrome; -4 wrong font; -8 extra accents on Monochrome. Start at 100.`;
+        const user = `## Family: ${b.family}\n## Contract:\n${TOKENS[b.family]}\n\n## Reference:\n\`\`\`\n${refHtml.slice(0, 8000)}\n\`\`\`\n\n## Candidate to grade:\n\`\`\`\n${html.slice(0, 20000)}\n\`\`\`\n\nReturn JSON.`;
+        try {
+          const out = await callAnthropic({ system, user, maxTokens: 600 });
+          let parsed;
+          try { parsed = JSON.parse(stripFences(out)); }
+          catch { parsed = { score: 50, summary: 'grader parse fallback' }; }
+          return json(res, parsed);
+        } catch (e) { return json(res, { error: e.message }, 500); }
+      }
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        });
+        return res.end();
+      }
+      res.writeHead(404); res.end('not found');
+    } catch (e) {
+      stderr.write('server error: ' + e.message + '\n');
+      try { json(res, { error: e.message }, 500); } catch {}
+    }
+  });
+
+  server.listen(port, () => {
+    const url = `http://localhost:${port}`;
+    stdout.write(`\n🏁  Handoff-CDN Arena\n\n    ${url}\n\n    Opening in your browser...\n    Press Ctrl+C to stop.\n\n`);
+    try {
+      const opener = process.platform === 'win32' ? `start "" "${url}"` :
+                     process.platform === 'darwin' ? `open "${url}"` :
+                     `xdg-open "${url}"`;
+      execSync(opener, { stdio: 'ignore' });
+    } catch {}
+  });
+  await new Promise(() => {});
 }
 
 // ── use ───────────────────────────────────────────────────────────────────────
