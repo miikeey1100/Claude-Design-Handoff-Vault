@@ -88,6 +88,51 @@ function get(url) {
   });
 }
 
+// Anthropic Messages API — zero-dep, uses ANTHROPIC_API_KEY env var
+function callAnthropic({ system, user, model, maxTokens = 8192 }) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set. Get one at https://platform.claude.com/settings/keys');
+  const selected = model || process.env.HANDOFF_MODEL || 'claude-opus-4-7-20250101';
+  const payload = JSON.stringify({
+    model: selected,
+    max_tokens: maxTokens,
+    system,
+    messages: [{ role: 'user', content: user }],
+  });
+  return new Promise((resolve, reject) => {
+    const req = https.request('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+    }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        if (res.statusCode !== 200)
+          return reject(new Error(`Anthropic ${res.statusCode}: ${text.slice(0, 500)}`));
+        try {
+          const json = JSON.parse(text);
+          resolve(json.content.map(c => c.text || '').join(''));
+        } catch (e) { reject(new Error('Bad JSON from Anthropic: ' + text.slice(0, 200))); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+// Strip optional markdown code fences from model output (```json ... ```)
+function stripFences(s) {
+  const m = s.trim().match(/^```(?:json)?\s*\n([\s\S]*?)\n```\s*$/);
+  return m ? m[1] : s.trim();
+}
+
 async function loadManifest() {
   try {
     const raw = await fs.readFile(LOCAL_MANIFEST, 'utf8');
@@ -121,6 +166,8 @@ Handoff-CDN — The Design-to-Code Protocol  v${VERSION}
 
   npx handoff-cdn use <slug>            Stream bundle prompt to stdout
   npx handoff-cdn list                  Show all registered bundles
+  npx handoff-cdn search <keyword>      Search bundles by name/tag/description
+  npx handoff-cdn random                Pick a random bundle and stream it
   npx handoff-cdn preview <slug>        Open bundle in local browser
   npx handoff-cdn tokens <slug>         Print CSS token block only
   npx handoff-cdn cursorrules <slug>    Append token rules to .cursorrules
@@ -128,13 +175,17 @@ Handoff-CDN — The Design-to-Code Protocol  v${VERSION}
   npx handoff-cdn manifest              Print CDN registry JSON
   npx handoff-cdn skill install         Install as Claude Code skill
   npx handoff-cdn new                   Create a new bundle (interactive)
+  npx handoff-cdn doctor                Diagnose setup (node, CDN, API, claude)
+
+Powered by Opus 4.7 (requires ANTHROPIC_API_KEY):
+  npx handoff-cdn grade <file> --against <slug>    Score UI fidelity vs contract
+  npx handoff-cdn forge "<prompt>"                 Generate a new bundle from a prompt
 
 Examples:
   npx handoff-cdn use aerodrop | claude
   claude -p "$(npx handoff-cdn use luxar-vault)"
-  npx handoff-cdn preview agentic-ops
-  npx handoff-cdn tokens agentic-ops >> tokens.css
-  npx handoff-cdn cursorrules aerodrop >> .cursorrules
+  npx handoff-cdn grade ./dist/index.html --against aerodrop
+  npx handoff-cdn forge "neobrutalist notes app, orange accents"
 
 Protocol: https://github.com/miikeey1100/Claude-Design-Handoff-Vault
 `);
@@ -478,18 +529,270 @@ npx handoff-cdn use ${slug} | claude
   exit(0);
 }
 
+// ── search ────────────────────────────────────────────────────────────────────
+if (cmd === 'search') {
+  if (!arg) { stderr.write('Usage: handoff-cdn search <keyword>\n'); exit(1); }
+  const q = arg.toLowerCase();
+  const hits = manifest.bundles.filter(b =>
+    b.slug.includes(q) ||
+    b.title.toLowerCase().includes(q) ||
+    (b.description || '').toLowerCase().includes(q) ||
+    (b.tags || []).some(t => t.toLowerCase().includes(q))
+  );
+  if (!hits.length) { stdout.write(`No bundles match "${arg}"\n`); exit(0); }
+  stdout.write(`\n${hits.length} bundle${hits.length > 1 ? 's' : ''} matching "${arg}":\n\n`);
+  for (const b of hits) {
+    stdout.write(`  ${b.slug.padEnd(18)} [${b.family}]  ${b.title}\n`);
+    if (b.tags) stdout.write(`    tags: ${b.tags.join(', ')}\n`);
+  }
+  stdout.write(`\nUse:  npx handoff-cdn use <slug> | claude\n\n`);
+  exit(0);
+}
+
+// ── random ────────────────────────────────────────────────────────────────────
+if (cmd === 'random') {
+  const picked = manifest.bundles[Math.floor(Math.random() * manifest.bundles.length)];
+  stderr.write(`🎲 Picked: ${picked.slug} (${picked.family})\n`);
+  args[0] = picked.slug;
+  // Fall through to `use` flow below by rewriting cmd
+  globalThis.__handoff_force_use_slug = picked.slug;
+}
+
+// ── doctor ────────────────────────────────────────────────────────────────────
+if (cmd === 'doctor') {
+  stdout.write('\nHandoff-CDN Doctor\n\n');
+  const checks = [];
+  const [maj] = process.versions.node.split('.').map(Number);
+  checks.push({ name: 'Node >= 18', pass: maj >= 18, detail: `v${process.versions.node}` });
+  let cdnOk = false;
+  try { await get(`${manifest.cdn}/manifest.json`); cdnOk = true; } catch {}
+  checks.push({ name: 'CDN reachable', pass: cdnOk, detail: manifest.cdn });
+  checks.push({
+    name: 'ANTHROPIC_API_KEY',
+    pass: !!process.env.ANTHROPIC_API_KEY,
+    detail: process.env.ANTHROPIC_API_KEY ? 'set (needed for grade/forge)' : 'missing (required for grade/forge)'
+  });
+  let claudeOk = false;
+  try { execSync('claude --version', { stdio: 'ignore' }); claudeOk = true; } catch {}
+  checks.push({
+    name: 'Claude Code CLI',
+    pass: claudeOk,
+    detail: claudeOk ? 'installed' : 'not found (npm i -g @anthropic-ai/claude-code)'
+  });
+  checks.push({ name: 'Manifest bundles', pass: manifest.bundles.length > 0, detail: `${manifest.bundles.length} bundles` });
+  for (const c of checks) {
+    stdout.write(`  ${c.pass ? '✓' : '✗'} ${c.name.padEnd(22)} ${c.detail}\n`);
+  }
+  const failed = checks.filter(c => !c.pass).length;
+  stdout.write(`\n  ${failed === 0 ? 'All checks passed.' : `${failed} check${failed > 1 ? 's' : ''} failing.`}\n\n`);
+  exit(failed === 0 ? 0 : 1);
+}
+
+// ── grade ─────────────────────────────────────────────────────────────────────
+if (cmd === 'grade') {
+  const againstIdx = args.indexOf('--against');
+  const slug = againstIdx >= 0 ? args[againstIdx + 1] : null;
+  const file = args.find(a => a && !a.startsWith('--') && a !== slug);
+  if (!file || !slug || !bySlug[slug]) {
+    stderr.write('Usage: handoff-cdn grade <file-or-url> --against <slug>\n');
+    stderr.write(`Available slugs: ${slugList}\n`);
+    exit(1);
+  }
+  const b = bySlug[slug];
+  let userCode;
+  try {
+    userCode = file.startsWith('http') ? await get(file) : await fs.readFile(file, 'utf8');
+  } catch (e) { stderr.write(`Cannot read ${file}: ${e.message}\n`); exit(1); }
+
+  stderr.write(`⚖  Grading ${file}\n   against: ${slug} (${b.family})\n   model: Opus 4.7...\n\n`);
+
+  const refHtml = await get(`${manifest.cdn}/${b.dir}/${b.primary}`).catch(() => '');
+  const system = `You are a strict design-fidelity grader for Handoff-CDN. Compare the user's implementation to the reference design contract. Return STRICTLY VALID JSON — no preamble, no code fences — matching:
+{
+  "score": <integer 0-100>,
+  "family": "${b.family}",
+  "summary": "<one-sentence verdict>",
+  "matches": [{"token":"string","detail":"string"}],
+  "violations": [{"severity":"high|med|low","token":"string","found":"string","expected":"string","line":<int or null>}]
+}
+Scoring rubric:
+- oklch() → hex conversion = HIGH (-8 each)
+- border-radius exceeding family limits = HIGH (-6 each)
+- missing backdrop-filter on Liquid Glass panels = HIGH (-10)
+- non-4px multiples on Monochrome spacing = MED (-3 each)
+- wrong font stack = MED (-4)
+- extra accent colors on Monochrome = HIGH (-8)
+- missing hairline strokes = LOW (-2)
+Start at 100, subtract. Floor at 0.`;
+
+  const user = `## Target family: ${b.family}
+## Token contract:
+${TOKENS[b.family]}
+
+## Reference (gold standard):
+\`\`\`
+${refHtml.slice(0, 12000)}
+\`\`\`
+
+## User's implementation to grade:
+\`\`\`
+${userCode.slice(0, 24000)}
+\`\`\`
+
+Return the JSON fidelity report now.`;
+
+  let result;
+  try { result = await callAnthropic({ system, user, maxTokens: 4096 }); }
+  catch (e) { stderr.write(`Grader failed: ${e.message}\n`); exit(1); }
+
+  let report;
+  try { report = JSON.parse(stripFences(result)); }
+  catch { stderr.write('Grader returned non-JSON:\n' + result.slice(0, 800) + '\n'); exit(1); }
+
+  const score = Math.max(0, Math.min(100, report.score || 0));
+  const filled = Math.round(score / 5);
+  const bar = '█'.repeat(filled) + '░'.repeat(20 - filled);
+  const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+
+  stdout.write(`\n╔═══════════════════════════════════════════════════╗\n`);
+  stdout.write(`║  Handoff-CDN Fidelity Report                      ║\n`);
+  stdout.write(`║  ${slug.padEnd(18)}  ${b.family.padEnd(15)}        ║\n`);
+  stdout.write(`╚═══════════════════════════════════════════════════╝\n\n`);
+  stdout.write(`  Score:   ${score}/100  [${grade}]\n`);
+  stdout.write(`  ${bar}\n\n`);
+  stdout.write(`  ${report.summary || ''}\n\n`);
+
+  if (report.violations?.length) {
+    stdout.write(`  ✗ Violations (${report.violations.length}):\n`);
+    for (const v of report.violations) {
+      const icon = v.severity === 'high' ? '🔴' : v.severity === 'med' ? '🟡' : '🟢';
+      const loc = v.line ? ` (line ${v.line})` : '';
+      stdout.write(`    ${icon} ${v.token}${loc}\n       found:    ${v.found}\n       expected: ${v.expected}\n`);
+    }
+    stdout.write('\n');
+  }
+  if (report.matches?.length) {
+    stdout.write(`  ✓ Matches (${report.matches.length}):\n`);
+    for (const m of report.matches.slice(0, 6)) stdout.write(`    · ${m.token}: ${m.detail}\n`);
+    if (report.matches.length > 6) stdout.write(`    · … and ${report.matches.length - 6} more\n`);
+    stdout.write('\n');
+  }
+  exit(score >= 70 ? 0 : 1);
+}
+
+// ── forge ─────────────────────────────────────────────────────────────────────
+if (cmd === 'forge') {
+  const prompt = args.join(' ').trim();
+  if (!prompt) {
+    stderr.write('Usage: handoff-cdn forge "<description of UI>"\n');
+    stderr.write('Example: handoff-cdn forge "neobrutalist notes app, orange accents"\n');
+    exit(1);
+  }
+  stderr.write(`\n🔨 Forging bundle from: "${prompt}"\n`);
+  stderr.write(`   Model: Opus 4.7  ·  This takes ~30-60s...\n\n`);
+
+  const system = `You are a Handoff-CDN bundle generator. Given a UI description, produce a complete bundle.
+
+Output STRICTLY VALID JSON — no preamble, no code fences — matching this shape:
+{
+  "slug": "lowercase-kebab-case",
+  "title": "Name — tagline",
+  "description": "1-2 sentences",
+  "family": "Liquid Glass" | "Monochrome",
+  "tags": ["tag1","tag2","tag3","tag4"],
+  "html": "<!DOCTYPE html>...complete self-contained HTML, 15-30KB, real content not placeholders, all CSS inline, may use React via unpkg...",
+  "tokens_css": ":root { /* complete token contract */ }",
+  "intent_transcript": "30-50 lines of synthetic designer chat — first-person, reasoning through color/layout/type choices, arriving at final tokens"
+}
+
+HARD RULES:
+- Choose ONE family and commit. No mixing.
+- Liquid Glass: oklch() colors only, backdrop-filter: blur(16px) saturate(140%) on every panel, radius 10-32px.
+- Monochrome: hex only, 4px baseline (every spacing is a multiple of 4), radius ≤6px, #00b872 is sole accent (live/status only), no gradients.
+- Real labels, real numbers, real copy. No "Lorem ipsum", no "Item 1", no placeholder text.
+- HTML must render standalone — all CSS inline, no external stylesheets except Google Fonts/unpkg.
+- Bundle must be internally consistent — every oklch/hex/radius/spacing value traceable to the same system.
+
+Output ONLY the JSON. Nothing else.`;
+
+  const user = `Generate a Handoff-CDN bundle for: ${prompt}`;
+
+  let result;
+  try { result = await callAnthropic({ system, user, maxTokens: 16000 }); }
+  catch (e) { stderr.write(`Forge failed: ${e.message}\n`); exit(1); }
+
+  let bundle;
+  try { bundle = JSON.parse(stripFences(result)); }
+  catch (e) { stderr.write('Forge returned non-JSON:\n' + result.slice(0, 800) + '\n'); exit(1); }
+
+  const dir = path.resolve(cwd(), 'bundles', bundle.slug);
+  await fs.mkdir(path.join(dir, 'project'), { recursive: true });
+  await fs.mkdir(path.join(dir, 'chats'), { recursive: true });
+
+  const primaryName = (bundle.title.split('—')[0].trim().replace(/\s+/g, '') || bundle.slug) + '.html';
+  await fs.writeFile(path.join(dir, 'project', primaryName), bundle.html, 'utf8');
+  await fs.writeFile(path.join(dir, 'project', 'tokens.css'), bundle.tokens_css, 'utf8');
+  await fs.writeFile(path.join(dir, 'chats', 'chat1.md'), bundle.intent_transcript, 'utf8');
+  await fs.writeFile(
+    path.join(dir, 'README.md'),
+    `# ${bundle.title}\n\n${bundle.description}\n\n**Family:** ${bundle.family}\n**Tags:** ${(bundle.tags || []).join(', ')}\n\nForged by Opus 4.7 via \`npx handoff-cdn forge\`.\n`,
+    'utf8'
+  );
+
+  // Append to local manifest.json
+  const manifestEntry = {
+    slug: bundle.slug,
+    title: bundle.title,
+    description: bundle.description,
+    family: bundle.family,
+    fidelity: 90,
+    tags: bundle.tags || [],
+    dir: `bundles/${bundle.slug}`,
+    primary: `project/${primaryName}`,
+    chat: 'chats/chat1.md',
+    preview: `previews/${bundle.slug}.png`,
+    comparison: `previews/comparisons/${bundle.slug}.png`,
+    forged: true,
+  };
+  try {
+    const mf = JSON.parse(await fs.readFile(LOCAL_MANIFEST, 'utf8'));
+    if (!mf.bundles.some(x => x.slug === bundle.slug)) {
+      mf.bundles.push(manifestEntry);
+      mf.updated = new Date().toISOString().slice(0, 10);
+      await fs.writeFile(LOCAL_MANIFEST, JSON.stringify(mf, null, 2) + '\n', 'utf8');
+    }
+  } catch {}
+
+  stdout.write(`\n✓ Bundle forged: ${dir}\n\n`);
+  stdout.write(`  slug:   ${bundle.slug}\n`);
+  stdout.write(`  title:  ${bundle.title}\n`);
+  stdout.write(`  family: ${bundle.family}\n`);
+  stdout.write(`  tags:   ${(bundle.tags || []).join(', ')}\n\n`);
+  stdout.write(`  Files:\n`);
+  stdout.write(`    project/${primaryName}\n`);
+  stdout.write(`    project/tokens.css\n`);
+  stdout.write(`    chats/chat1.md\n`);
+  stdout.write(`    README.md\n\n`);
+  stdout.write(`Next:\n`);
+  stdout.write(`  npx handoff-cdn preview ${bundle.slug}\n`);
+  stdout.write(`  npm run capture && git add bundles/${bundle.slug} previews manifest.json\n`);
+  stdout.write(`  git commit -m "forge: ${bundle.slug}" && git push\n\n`);
+  exit(0);
+}
+
 // ── use ───────────────────────────────────────────────────────────────────────
-if (cmd !== 'use') {
+if (cmd !== 'use' && cmd !== 'random') {
   stderr.write(`Unknown command: "${cmd}"\nTry: npx handoff-cdn --help\n`);
   exit(1);
 }
 
-if (!arg || !bySlug[arg]) {
-  stderr.write(`Unknown bundle: "${arg}"\nAvailable: ${slugList}\n`);
+const targetSlug = globalThis.__handoff_force_use_slug || arg;
+if (!targetSlug || !bySlug[targetSlug]) {
+  stderr.write(`Unknown bundle: "${targetSlug}"\nAvailable: ${slugList}\n`);
   exit(1);
 }
 
-const b = bySlug[arg];
+const b = bySlug[targetSlug];
 const htmlUrl = `${manifest.cdn}/${b.dir}/${b.primary}`;
 const chatUrl = `${manifest.cdn}/${b.dir}/${b.chat}`;
 

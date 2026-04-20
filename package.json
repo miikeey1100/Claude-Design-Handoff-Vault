@@ -1,7 +1,7 @@
 {
   "name": "handoff-cdn",
-  "version": "0.3.0",
-  "description": "Handoff-CDN — The Design-to-Code Protocol for Claude. Stream high-fidelity UI bundles into Claude Code instantly.",
+  "version": "0.4.0",
+  "description": "Handoff-CDN — Design-to-Code Protocol. Stream pixel-perfect UI bundles into Claude Code. Grade + forge bundles with Opus 4.7.",
   "type": "module",
   "bin": {
     "handoff-cdn": "bin/handoff-cdn.js",
@@ -15,9 +15,13 @@
   "keywords": [
     "claude",
     "claude-code",
+    "opus-4-7",
     "design",
+    "design-tokens",
     "ui",
     "handoff",
+    "design-to-code",
+    "oklch",
     "playwright"
   ],
   "author": "miikeey1100",

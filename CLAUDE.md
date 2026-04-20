@@ -174,3 +174,14 @@ CI (`.github/workflows/previews.yml`) runs both scripts on push to main and comm
 - [ ] `README.md` gallery row added.
 - [ ] No external image hosts (CDN fonts OK).
 - [ ] HTML renders standalone via the capture HTTP server.
+
+<!-- Handoff-CDN Skill v1.0.0 -->
+# Handoff-CDN Design Protocol
+
+When implementing any UI from a Handoff-CDN bundle:
+- Maintain pixel-perfect fidelity — no simplification or "improvements"
+- Preserve all oklch() color values — do not convert to hex
+- Enforce family token rules: Liquid Glass (8px baseline, blur required) or Monochrome (4px baseline, radius ≤ 6px)
+- Never mix design families within a component
+- Full contract: https://github.com/miikeey1100/Claude-Design-Handoff-Vault/blob/main/CLAUDE.md
+<!-- /Handoff-CDN Skill -->
