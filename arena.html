@@ -139,10 +139,29 @@
     font-family: var(--mono);
     font-size: 13px;
     color: var(--ink-50);
-    min-width: 70px;
+    min-width: 140px;
     text-align: right;
+    display: flex; flex-direction: column; gap: 4px; align-items: flex-end;
   }
   .lane-score strong { color: var(--ink-100); font-size: 16px; font-weight: 700; }
+  .live-bar {
+    width: 120px; height: 4px; background: var(--stroke); border-radius: 2px; overflow: hidden; display: none;
+  }
+  .live-bar.on { display: block; }
+  .live-bar-fill {
+    height: 100%; width: 0%; border-radius: 2px;
+    transition: width 0.4s ease-out;
+  }
+  .live-bar-fill.a { background: linear-gradient(90deg, oklch(0.65 0.18 25), oklch(0.75 0.16 30)); }
+  .live-bar-fill.b { background: linear-gradient(90deg, oklch(0.72 0.14 160), var(--good)); }
+  .live-label {
+    font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 4px; font-weight: 600;
+    background: oklch(0 0 0 / 0.4); color: var(--ink-50);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .live-label .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
 
   .lane-viewport {
     flex: 1;
@@ -275,7 +294,10 @@
     <div class="lane">
       <div class="lane-head">
         <div class="lane-title"><span class="chip a">LANE A</span> Plain Opus 4.7</div>
-        <div class="lane-score" id="score-a">—</div>
+        <div class="lane-score">
+          <span id="score-a">—</span>
+          <div class="live-bar" id="livebar-a"><div class="live-bar-fill a" id="livefill-a"></div></div>
+        </div>
       </div>
       <div class="lane-viewport" id="viewport-a">
         <div class="lane-placeholder">Awaiting prompt…<div class="hint">just the prompt, no design contract</div></div>
@@ -284,7 +306,10 @@
     <div class="lane">
       <div class="lane-head">
         <div class="lane-title"><span class="chip b">LANE B</span> Opus 4.7 + Handoff-CDN</div>
-        <div class="lane-score" id="score-b">—</div>
+        <div class="lane-score">
+          <span id="score-b">—</span>
+          <div class="live-bar" id="livebar-b"><div class="live-bar-fill b" id="livefill-b"></div></div>
+        </div>
       </div>
       <div class="lane-viewport" id="viewport-b">
         <div class="lane-placeholder">Awaiting prompt…<div class="hint">prompt + design contract + reference bundle</div></div>
@@ -380,6 +405,32 @@ async function grade(html, slug) {
   return r.json();
 }
 
+// Progressive "live" bar — animates while generation is in flight.
+// Simulates asymptotic progress (0 → 85) over estimated time, then snaps to
+// real score when generation + grading completes.
+function startLiveBar(which, estSeconds = 45) {
+  const bar = $('livebar-' + which);
+  const fill = $('livefill-' + which);
+  const scoreEl = $('score-' + which);
+  bar.classList.add('on');
+  fill.style.width = '0%';
+  scoreEl.innerHTML = '<span class="live-label"><span class="pulse"></span>LIVE</span>';
+  const start = Date.now();
+  let snapshot = 0;
+  const intv = setInterval(() => {
+    const t = (Date.now() - start) / 1000;
+    // asymptotic curve: 85 * (1 - e^(-t/est))
+    const pct = 85 * (1 - Math.exp(-t / estSeconds));
+    if (pct > snapshot) snapshot = pct;
+    fill.style.width = snapshot.toFixed(1) + '%';
+  }, 300);
+  return { stop: (realScore) => {
+    clearInterval(intv);
+    fill.style.width = (realScore != null ? realScore : snapshot) + '%';
+    if (realScore == null) bar.classList.remove('on');
+  }};
+}
+
 async function race() {
   const prompt = $('prompt').value.trim();
   const slug = $('bundle').value;
@@ -394,26 +445,32 @@ async function race() {
   setLaneLoading('a', 'Plain Opus 4.7 generating…');
   setLaneLoading('b', 'Opus 4.7 + Handoff-CDN generating…');
 
-  // Run both in parallel
-  const [htmlA, htmlB] = await Promise.all([
-    generate(prompt, slug, false).catch(e => { setLaneError('a', e.message); return null; }),
-    generate(prompt, slug, true).catch(e => { setLaneError('b', e.message); return null; }),
+  // Start live bars
+  const barA = startLiveBar('a');
+  const barB = startLiveBar('b');
+
+  // Run both in parallel; each lane stops its bar and kicks off grading as soon as it finishes.
+  async function runLane(which, withBundle, bar) {
+    let html = null;
+    try { html = await generate(prompt, slug, withBundle); }
+    catch (e) { bar.stop(null); setLaneError(which, e.message); return null; }
+    renderHTML(which, html);
+    // Keep bar animating during grading
+    $('score-' + which).innerHTML = '<span class="live-label"><span class="pulse"></span>GRADING</span>';
+    let r = null;
+    try { r = await grade(html, slug); } catch {}
+    bar.stop(r ? r.score : null);
+    if (r) $('score-' + which).innerHTML = '<strong>' + r.score + '</strong> <small>/ 100</small>';
+    else $('score-' + which).textContent = '—';
+    return { html, report: r };
+  }
+
+  const [resA, resB] = await Promise.all([
+    runLane('a', false, barA),
+    runLane('b', true, barB),
   ]);
 
-  if (htmlA) renderHTML('a', htmlA);
-  if (htmlB) renderHTML('b', htmlB);
-
-  // Grade each
-  $('score-a').innerHTML = '<em style="font-style:normal;color:var(--ink-50);font-size:11px">grading…</em>';
-  $('score-b').innerHTML = '<em style="font-style:normal;color:var(--ink-50);font-size:11px">grading…</em>';
-
-  const [rA, rB] = await Promise.all([
-    htmlA ? grade(htmlA, slug).catch(() => null) : Promise.resolve(null),
-    htmlB ? grade(htmlB, slug).catch(() => null) : Promise.resolve(null),
-  ]);
-
-  if (rA) $('score-a').innerHTML = '<strong>' + rA.score + '</strong> <small>/ 100</small>';
-  if (rB) $('score-b').innerHTML = '<strong>' + rB.score + '</strong> <small>/ 100</small>';
+  const rA = resA?.report, rB = resB?.report;
 
   if (rA && rB) {
     $('report').classList.add('on');
