@@ -219,13 +219,34 @@ function mockResponse({ system = '', user = '', images = [] }) {
   }
 
   // ── Arena mini grader (shorter rubric) ──────────────────────────────────
+  // Score the CANDIDATE itself — not the presence of a reference. This makes
+  // the arena demo actually differentiate: withBundle=true lane generates HTML
+  // with oklch+backdrop-filter, withBundle=false lane doesn't. Same grader,
+  // different outcome.
   if (s.includes('grade ui fidelity against a handoff-cdn contract')) {
-    const hasRef = u.includes('## reference:');
+    const candidateMatch = user.match(/## Candidate to grade:\s*```[a-z]*\s*([\s\S]*?)```/i);
+    const cand = (candidateMatch?.[1] || '').toLowerCase();
+    const family = user.match(/## Family:\s*(Liquid Glass|Monochrome)/)?.[1] || 'Liquid Glass';
+    let score = 100, reasons = [];
+    if (family === 'Liquid Glass') {
+      if (!cand.includes('oklch(')) { score -= 20; reasons.push('no oklch'); }
+      if (!cand.includes('backdrop-filter')) { score -= 18; reasons.push('no blur'); }
+      // hex-heavy candidates = plain-output signature
+      const hexCount = (cand.match(/#[0-9a-f]{6}\b/g) || []).length;
+      if (hexCount >= 3) { score -= 8; reasons.push('hex conversions'); }
+    } else {
+      if (cand.includes('oklch(')) { score -= 6; reasons.push('oklch on mono'); }
+      const grads = (cand.match(/linear-gradient\(|radial-gradient\(/g) || []).length;
+      if (grads) { score -= 8 * Math.min(grads, 3); reasons.push('gradients'); }
+      const radii = [...cand.matchAll(/border-radius\s*:\s*([0-9]+)px/g)].map(m => +m[1]);
+      if (radii.some(r => r > 6)) { score -= 10; reasons.push('over-cap radius'); }
+    }
+    score = Math.max(50, Math.min(99, score + j(0, 2)));
     return JSON.stringify({
-      score: hasRef ? j(96, 1) : j(64, 4),
-      summary: hasRef
-        ? 'Tokens preserved, family rules respected.'
-        : 'Multiple token deviations detected.',
+      score,
+      summary: reasons.length
+        ? `Deviations: ${reasons.join(', ')}.`
+        : `Tokens preserved, ${family} rules respected.`,
     });
   }
 
@@ -1549,29 +1570,34 @@ Output ONLY the JSON. Nothing else.`;
     'utf8'
   );
 
-  // Append to local manifest.json
-  const manifestEntry = {
-    slug: bundle.slug,
-    title: bundle.title,
-    description: bundle.description,
-    family: bundle.family,
-    fidelity: 90,
-    tags: bundle.tags || [],
-    dir: `bundles/${bundle.slug}`,
-    primary: `project/${primaryName}`,
-    chat: 'chats/chat1.md',
-    preview: `previews/${bundle.slug}.png`,
-    comparison: `previews/comparisons/${bundle.slug}.png`,
-    forged: true,
-  };
-  try {
-    const mf = JSON.parse(await fs.readFile(LOCAL_MANIFEST, 'utf8'));
-    if (!mf.bundles.some(x => x.slug === bundle.slug)) {
-      mf.bundles.push(manifestEntry);
-      mf.updated = new Date().toISOString().slice(0, 10);
-      await fs.writeFile(LOCAL_MANIFEST, JSON.stringify(mf, null, 2) + '\n', 'utf8');
-    }
-  } catch {}
+  // Append to the CWD's manifest.json if one exists — never touch the installed
+  // package manifest. In --mock mode, skip manifest mutation entirely (mock
+  // outputs are ephemeral demo artifacts, not real bundles).
+  if (process.env.HANDOFF_MOCK !== '1') {
+    const manifestEntry = {
+      slug: bundle.slug,
+      title: bundle.title,
+      description: bundle.description,
+      family: bundle.family,
+      fidelity: 90,
+      tags: bundle.tags || [],
+      dir: `bundles/${bundle.slug}`,
+      primary: `project/${primaryName}`,
+      chat: 'chats/chat1.md',
+      preview: `previews/${bundle.slug}.png`,
+      comparison: `previews/comparisons/${bundle.slug}.png`,
+      forged: true,
+    };
+    const cwdManifest = path.resolve(cwd(), 'manifest.json');
+    try {
+      const mf = JSON.parse(await fs.readFile(cwdManifest, 'utf8'));
+      if (!mf.bundles.some(x => x.slug === bundle.slug)) {
+        mf.bundles.push(manifestEntry);
+        mf.updated = new Date().toISOString().slice(0, 10);
+        await fs.writeFile(cwdManifest, JSON.stringify(mf, null, 2) + '\n', 'utf8');
+      }
+    } catch {} // no cwd manifest — that's fine, user can add entry manually
+  }
 
   stdout.write(`\n✓ Bundle forged: ${dir}\n\n`);
   stdout.write(`  slug:   ${bundle.slug}\n`);
