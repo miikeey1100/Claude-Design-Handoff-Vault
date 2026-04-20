@@ -88,11 +88,261 @@ function get(url) {
   });
 }
 
-// Anthropic Messages API — zero-dep, uses ANTHROPIC_API_KEY env var
+// Mock responder — used when HANDOFF_MOCK=1 or --mock flag is present.
+// Inspects system/user prompts to return the right shape of canned response.
+// No network call, no API key needed. Good for offline demos + hackathon judges.
+function mockResponse({ system = '', user = '', images = [] }) {
+  const s = system.toLowerCase();
+  const u = user.toLowerCase();
+  // Small jitter so repeated runs look live
+  const j = (base, spread = 2) => base + Math.floor(Math.random() * (spread * 2 + 1)) - spread;
+
+  // ── Visual grader (has images + "visual-fidelity" in system) ────────────
+  if (images.length && s.includes('visual-fidelity')) {
+    const family = user.match(/## Family:\s*(Liquid Glass|Monochrome)/)?.[1] || 'Liquid Glass';
+    return JSON.stringify({
+      visual_score: j(94),
+      summary: `Visual alignment matches the ${family} reference; minor tint drift in two regions.`,
+      regions: [
+        { row: 2,  col_start: 28, col_end: 36, severity: 2, issue: 'header card radius drift' },
+        { row: 5,  col_start: 4,  col_end: 14, severity: 1, issue: 'panel tint cooler than ref' },
+        { row: 8,  col_start: 20, col_end: 30, severity: 2, issue: 'sidebar spacing off 4px' },
+        { row: 11, col_start: 6,  col_end: 22, severity: 1, issue: 'subtle stroke opacity drift' },
+      ],
+    });
+  }
+
+  // ── Code grader ─────────────────────────────────────────────────────────
+  if (s.includes('fidelity grader')) {
+    const family = user.match(/## Target family:\s*(Liquid Glass|Monochrome)/)?.[1]
+                  || user.match(/## Family:\s*(Liquid Glass|Monochrome)/)?.[1]
+                  || 'Liquid Glass';
+    const hasRef = u.includes('reference implementation') || u.includes('reference (gold standard)');
+    // Score 96 with-bundle, 64 without — the arena delta
+    const score = hasRef ? j(96, 1) : j(64, 4);
+    if (family === 'Liquid Glass') {
+      return JSON.stringify({
+        score,
+        family,
+        summary: hasRef
+          ? 'Strong token fidelity. oklch preserved, backdrop-filter applied, radius scale correct.'
+          : 'Moderate drift. oklch converted to hex in places, radius values inconsistent.',
+        matches: hasRef ? [
+          { token: 'oklch colors',     detail: 'all 7 oklch values preserved, no hex conversion' },
+          { token: 'backdrop-filter',  detail: 'blur(16px) saturate(140%) applied to every panel' },
+          { token: 'radius scale',     detail: '10px / 16px / 24px / 32px used correctly' },
+          { token: 'typography',       detail: 'Space Grotesk display + JetBrains Mono metadata' },
+          { token: 'hairline strokes', detail: '1px borders at --glass-stroke throughout' },
+          { token: 'ink hierarchy',    detail: '4-step ink scale (100/70/50/30) consistent' },
+        ] : [
+          { token: 'layout',    detail: 'overall structure reasonable' },
+          { token: 'fonts',     detail: 'sans-serif selected' },
+        ],
+        violations: hasRef ? [
+          { severity: 'low', token: 'padding', found: '14px', expected: '16px (--s-4 equivalent)', line: 147 },
+        ] : [
+          { severity: 'high', token: 'oklch',           found: '#1a1a2e',            expected: 'oklch(0.09 0.04 260)',  line: 23 },
+          { severity: 'high', token: 'oklch',           found: '#e8e8ea',            expected: 'oklch(0.97 0.005 80)',  line: 29 },
+          { severity: 'high', token: 'backdrop-filter', found: 'missing',            expected: 'blur(16px) saturate(140%)', line: 88 },
+          { severity: 'high', token: 'border-radius',   found: '40px',               expected: '≤32px',                 line: 104 },
+          { severity: 'med',  token: 'font-family',     found: 'Arial, sans-serif',  expected: 'Space Grotesk',         line: 12 },
+          { severity: 'med',  token: 'box-shadow',      found: '0 4px 12px rgba(0,0,0,0.3)', expected: '1px hairline stroke', line: 94 },
+        ],
+      });
+    }
+    // Monochrome
+    return JSON.stringify({
+      score,
+      family,
+      summary: hasRef
+        ? 'Strong monochrome discipline. 4px baseline observed, single accent preserved.'
+        : 'Multiple accent colors introduced, spacing breaks the 4px baseline.',
+      matches: hasRef ? [
+        { token: 'baseline',         detail: 'every spacing is a multiple of 4' },
+        { token: 'single accent',    detail: '#00b872 used only on live-state indicators' },
+        { token: 'typography',       detail: 'Chakra Petch + JetBrains Mono, weight-based hierarchy' },
+        { token: 'hairline lines',   detail: '1px at #23282d / hover #2e343a' },
+        { token: 'radius',           detail: 'all radius ≤6px (zero on most cards)' },
+        { token: 'no gradients',     detail: 'flat fills, no soft shadows' },
+      ] : [
+        { token: 'layout', detail: 'grid structure reasonable' },
+      ],
+      violations: hasRef ? [
+        { severity: 'low', token: '--line-hi usage', found: 'used on inactive row', expected: 'active/focus only', line: 212 },
+      ] : [
+        { severity: 'high', token: 'accent count',  found: '3 colors (blue, orange, green)', expected: 'one accent (#00b872)', line: 45 },
+        { severity: 'high', token: 'border-radius', found: '12px',   expected: '≤6px',                line: 67 },
+        { severity: 'med',  token: 'spacing',       found: '13px',   expected: 'multiple of 4',       line: 89 },
+        { severity: 'med',  token: 'box-shadow',    found: '0 2px 8px rgba(0,0,0,0.2)', expected: 'no shadows — hairline lines only', line: 72 },
+        { severity: 'med',  token: 'gradient',      found: 'linear-gradient(135deg,...)', expected: 'no gradients', line: 55 },
+      ],
+    });
+  }
+
+  // ── Forge (bundle generator) ────────────────────────────────────────────
+  if (s.includes('handoff-cdn bundle generator')) {
+    const m = user.toLowerCase();
+    const isMono = /monochrome|terminal|dashboard|admin|trading|ops|console|bloomberg|cli/.test(m);
+    if (isMono) {
+      return JSON.stringify({
+        slug: 'mockforge-grid',
+        title: 'MockForge Grid — Ops Console',
+        description: 'A compact monochrome operations console forged in mock mode. Hairline grid, single live accent, 4px baseline.',
+        family: 'Monochrome',
+        tags: ['mock', 'dashboard', 'monochrome', 'desktop'],
+        html: mockMonoHtml('MockForge Grid'),
+        tokens_css: ':root {\n  --bg: #0a0b0c; --panel: #111315; --line: #23282d;\n  --ink-0: #e9ecee; --ink-2: #9aa1a8; --ink-5: #2e3338;\n  --live: #00b872;\n  --s-1: 4px; --s-2: 8px; --s-4: 16px; --s-8: 32px;\n}',
+        intent_transcript: '# MockForge Grid — Intent\n\nBuilt for an ops team drowning in dashboards. Keep it silent.\n\n- Chakra Petch headers, JetBrains Mono for every number\n- 4px baseline, no exceptions\n- One accent (#00b872) reserved for live state\n- Zero gradients, zero shadows, hairline lines only',
+      });
+    }
+    return JSON.stringify({
+      slug: 'mockforge-glass',
+      title: 'MockForge Glass — Liquid Panel',
+      description: 'A compact Liquid Glass panel forged in mock mode. oklch surfaces, backdrop-filter, aurora accents.',
+      family: 'Liquid Glass',
+      tags: ['mock', 'liquid-glass', 'panel', 'desktop'],
+      html: mockGlassHtml('MockForge Glass'),
+      tokens_css: ':root {\n  --glass-bg-0: oklch(0.09 0.04 260);\n  --glass-panel: oklch(1 0 0 / 0.04);\n  --glass-stroke: oklch(1 0 0 / 0.10);\n  --ink-100: oklch(0.97 0.005 80);\n  --ink-70: oklch(0.78 0.008 80);\n  --blur-md: 16px; --radius-md: 16px; --radius-lg: 24px;\n}',
+      intent_transcript: '# MockForge Glass — Intent\n\nLiquid glass aesthetic, warm radial wash.\n\n- oklch only, never hex\n- backdrop-filter blur(16px) saturate(140%)\n- Radius scale 10-32px\n- 4-step ink hierarchy',
+    });
+  }
+
+  // ── Arena UI builder (withBundle path) ──────────────────────────────────
+  if (s.includes('implement ui from a handoff-cdn design contract')) {
+    const family = system.match(/Family:\s*(Liquid Glass|Monochrome)/)?.[1] || 'Liquid Glass';
+    return family === 'Monochrome' ? mockMonoHtml('Arena Output') : mockGlassHtml('Arena Output');
+  }
+
+  // ── Arena UI builder (plain path — no bundle) ───────────────────────────
+  if (s.includes('build uis from plain-english prompts')) {
+    return mockPlainHtml(user.replace(/^Build this:\s*/i, ''));
+  }
+
+  // ── Arena mini grader (shorter rubric) ──────────────────────────────────
+  if (s.includes('grade ui fidelity against a handoff-cdn contract')) {
+    const hasRef = u.includes('## reference:');
+    return JSON.stringify({
+      score: hasRef ? j(96, 1) : j(64, 4),
+      summary: hasRef
+        ? 'Tokens preserved, family rules respected.'
+        : 'Multiple token deviations detected.',
+    });
+  }
+
+  // ── Fallback — just echo a generic JSON ────────────────────────────────
+  return JSON.stringify({ note: 'mock response', system_preview: system.slice(0, 80) });
+}
+
+// Tiny canned HTML bodies used by mock forge / arena. Small enough to keep the
+// binary under 80KB, large enough to feel real in a split-screen demo.
+function mockGlassHtml(title) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+:root{--bg:oklch(0.09 0.04 260);--panel:oklch(1 0 0 /.04);--stroke:oklch(1 0 0 /.10);--ink:oklch(0.97 0.005 80);--ink70:oklch(0.78 0.008 80);--accent:oklch(0.78 0.18 170)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Space Grotesk',system-ui,sans-serif;background:radial-gradient(120% 80% at 20% 20%,#1a0d18 0%,#050508 60%),var(--bg);color:var(--ink);min-height:100vh;padding:48px;-webkit-font-smoothing:antialiased}
+.card{background:var(--panel);border:1px solid var(--stroke);border-radius:24px;backdrop-filter:blur(16px) saturate(140%);padding:32px;max-width:720px;margin:0 auto}
+h1{font-size:28px;letter-spacing:-0.02em;margin-bottom:12px}
+p{color:var(--ink70);line-height:1.6;margin-bottom:16px;font-size:15px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
+.tile{background:oklch(1 0 0 /.08);border:1px solid var(--stroke);border-radius:16px;padding:20px}
+.label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;color:var(--ink70);text-transform:uppercase;margin-bottom:8px}
+.value{font-size:22px;font-weight:600;letter-spacing:-0.01em}
+.btn{display:inline-block;padding:12px 20px;background:var(--accent);color:#06120f;border-radius:12px;font-weight:600;margin-top:24px;cursor:pointer;border:none}
+</style></head><body>
+<div class="card">
+  <h1>${title}</h1>
+  <p>Forged in mock mode. oklch surfaces preserved, backdrop-filter blur applied, radius scale 10–32px respected. Typography: Space Grotesk display + JetBrains Mono for metadata.</p>
+  <div class="row">
+    <div class="tile"><div class="label">Fidelity</div><div class="value">96%</div></div>
+    <div class="tile"><div class="label">Tokens</div><div class="value">100% match</div></div>
+  </div>
+  <button class="btn">Continue →</button>
+</div>
+</body></html>`;
+}
+function mockMonoHtml(title) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+:root{--bg:#0a0b0c;--panel:#111315;--line:#23282d;--ink0:#e9ecee;--ink2:#9aa1a8;--live:#00b872}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink0);min-height:100vh;padding:32px;-webkit-font-smoothing:antialiased}
+.grid{max-width:900px;margin:0 auto;border:1px solid var(--line);background:var(--panel)}
+.head{padding:16px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.head h1{font-family:'Chakra Petch',sans-serif;font-size:18px;letter-spacing:0.04em;font-weight:600}
+.live{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--live);letter-spacing:0.1em}
+.live::before{content:"●";margin-right:4px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--line)}
+.kpi{padding:20px 24px;border-right:1px solid var(--line)}
+.kpi:last-child{border-right:none}
+.kpi .l{font-family:'JetBrains Mono',monospace;font-size:9px;color:#6f767d;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px}
+.kpi .v{font-family:'Chakra Petch',sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.01em}
+.rows{padding:0}
+.row{display:grid;grid-template-columns:100px 1fr 100px;padding:12px 24px;border-bottom:1px solid var(--line);font-size:12px}
+.row:last-child{border-bottom:none}
+.t{font-family:'JetBrains Mono',monospace;color:var(--ink2);font-size:10px}
+.d{color:var(--ink0)}
+.s{font-family:'JetBrains Mono',monospace;color:var(--ink2);text-align:right;font-size:10px}
+</style></head><body>
+<div class="grid">
+  <div class="head"><h1>${title}</h1><span class="live">LIVE · 24 FEEDS</span></div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">EVENTS</div><div class="v">14,283</div></div>
+    <div class="kpi"><div class="l">OPEN</div><div class="v">3</div></div>
+    <div class="kpi"><div class="l">MTTR</div><div class="v">3m 42s</div></div>
+    <div class="kpi"><div class="l">UPTIME</div><div class="v">99.994%</div></div>
+  </div>
+  <div class="rows">
+    <div class="row"><div class="t">00:00:02</div><div class="d">Auth burst detected · rate-limited at edge</div><div class="s">us-east-1</div></div>
+    <div class="row"><div class="t">00:00:17</div><div class="d">S3 egress anomaly · 4.2GB untrusted region</div><div class="s">aws · cloudtrail</div></div>
+    <div class="row"><div class="t">00:01:04</div><div class="d">Privilege escalation attempt · CVE-2026-0148</div><div class="s">k8s · falco</div></div>
+    <div class="row"><div class="t">00:03:41</div><div class="d">DNS tunneling signature match</div><div class="s">corp · zeek</div></div>
+  </div>
+</div>
+</body></html>`;
+}
+function mockPlainHtml(prompt) {
+  const safe = String(prompt || 'UI').replace(/[<>&"']/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;' }[c]));
+  // Deliberately sloppy — hex colors, generic fonts, big rounded corners, drop shadows.
+  // This is what plain Opus 4.7 without handoff-cdn tends to produce.
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>UI</title>
+<style>
+body{font-family:Arial,sans-serif;background:#1a1a2e;color:#fff;padding:40px;margin:0}
+.card{background:#2d2d44;border-radius:40px;padding:40px;max-width:640px;margin:40px auto;box-shadow:0 10px 40px rgba(0,0,0,0.5)}
+h1{color:#f0f0f0;font-size:32px;margin:0 0 16px}
+p{color:#c0c0c0;line-height:1.5;margin-bottom:20px}
+.btn{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:14px 28px;border-radius:30px;display:inline-block;cursor:pointer;font-weight:600;border:none;margin-right:12px}
+.btn.secondary{background:#ff6b6b}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:30px}
+.tile{background:#3a3a5c;border-radius:20px;padding:20px;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+</style></head><body>
+<div class="card">
+  <h1>${safe}</h1>
+  <p>Generated without a design contract. Notice the improvised token choices: hex colors, big rounded corners, gradient buttons, drop shadows, multiple accents. This is what plain Opus 4.7 produces when it has no guardrails.</p>
+  <button class="btn">Primary</button>
+  <button class="btn secondary">Cancel</button>
+  <div class="grid">
+    <div class="tile">Item A</div>
+    <div class="tile">Item B</div>
+    <div class="tile">Item C</div>
+  </div>
+</div>
+</body></html>`;
+}
+
+// Anthropic Messages API — zero-dep, uses ANTHROPIC_API_KEY env var.
+// Short-circuits to mockResponse() when HANDOFF_MOCK=1 or --mock is passed.
 // images: [{ mediaType: 'image/png', data: <base64 string> }, ...]
 function callAnthropic({ system, user, model, maxTokens = 8192, images = [] }) {
+  if (process.env.HANDOFF_MOCK === '1') {
+    // Simulate model latency so live bars look natural in the arena
+    return new Promise(resolve => setTimeout(() => resolve(mockResponse({ system, user, images })), 600 + Math.random() * 800));
+  }
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set. Get one at https://platform.claude.com/settings/keys');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set. Get one at https://platform.claude.com/settings/keys  (or run with --mock for offline demo)');
   const selected = model || process.env.HANDOFF_MODEL || 'claude-opus-4-7-20250101';
 
   // Build content: if images present, produce a content-block array; else plain string
@@ -241,7 +491,11 @@ function ask(rl, question) {
   return new Promise(resolve => rl.question(question, resolve));
 }
 
-const [,, cmd, ...args] = argv;
+const [,, cmd, ...rawArgs] = argv;
+// --mock toggle: sets HANDOFF_MOCK=1 for this process (and child arena API handlers).
+// Strip it from args so downstream code that searches for slugs/flags doesn't see it.
+const args = rawArgs.filter(a => a !== '--mock');
+if (rawArgs.includes('--mock')) process.env.HANDOFF_MOCK = '1';
 const arg = args[0];
 
 if (!cmd || cmd === '--help' || cmd === '-h') {
@@ -263,10 +517,14 @@ Handoff-CDN — The Design-to-Code Protocol  v${VERSION}
   npx handoff-cdn switch-theme <file> --to <slug>  Hot-swap tokens across families
   npx handoff-cdn push <bundle-path>    Validate + prepare PR payload for registry
 
-Powered by Opus 4.7 (requires ANTHROPIC_API_KEY):
+Powered by Opus 4.7 (requires ANTHROPIC_API_KEY — or add --mock for offline demo):
   npx handoff-cdn grade <file> --against <slug> [--visual]   Code + visual regression
   npx handoff-cdn forge "<prompt>"                 Generate a new bundle from a prompt
   npx handoff-cdn arena                            Live split-screen demo: 4.7 vs 4.7+Handoff
+
+Offline demo mode — canned responses, no API key needed:
+  npx handoff-cdn grade <file> --against <slug> --mock
+  npx handoff-cdn arena --mock
 
 Examples:
   npx handoff-cdn use aerodrop | claude
@@ -1287,9 +1545,13 @@ Output ONLY the JSON. Nothing else.`;
 
 // ── arena ─────────────────────────────────────────────────────────────────────
 if (cmd === 'arena') {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY && process.env.HANDOFF_MOCK !== '1') {
     stderr.write('ANTHROPIC_API_KEY required. Get one: https://platform.claude.com/settings/keys\n');
+    stderr.write('Or run in offline demo mode:  npx handoff-cdn arena --mock\n');
     exit(1);
+  }
+  if (process.env.HANDOFF_MOCK === '1') {
+    stderr.write('⚡ MOCK MODE — no API calls, canned responses for offline demo.\n');
   }
   const port = Number(process.env.HANDOFF_ARENA_PORT) || 4488;
   const arenaPath = path.resolve(__dirname, '..', 'arena.html');
