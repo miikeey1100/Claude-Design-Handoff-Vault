@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AuroraMail — AI-Native Email</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --glass-bg-0: oklch(0.09 0.04 260);
+  --glass-bg-1: oklch(0.14 0.008 270);
+  --glass-panel: oklch(1 0 0 / 0.04);
+  --glass-panel-hi: oklch(1 0 0 / 0.08);
+  --glass-stroke: oklch(1 0 0 / 0.10);
+  --glass-stroke-hi: oklch(1 0 0 / 0.18);
+  --wash-warm: radial-gradient(120% 80% at 20% 20%, #1a0d18 0%, #050508 60%);
+  --ink-100: oklch(0.97 0.005 80);
+  --ink-70: oklch(0.78 0.008 80);
+  --ink-50: oklch(0.58 0.010 80);
+  --ink-30: oklch(0.40 0.010 80);
+  --accent-aurora: oklch(0.78 0.18 170);
+  --accent-violet: oklch(0.68 0.20 300);
+  --blur-md: 16px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-display);
+  background:var(--wash-warm), var(--glass-bg-0);
+  color:var(--ink-100);
+  min-height:100vh;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.app{display:grid;grid-template-columns:240px 360px 1fr;height:100vh;gap:16px;padding:16px}
+.panel{
+  background:var(--glass-panel);
+  border:1px solid var(--glass-stroke);
+  border-radius:var(--radius-lg);
+  backdrop-filter:blur(var(--blur-md)) saturate(140%);
+  -webkit-backdrop-filter:blur(var(--blur-md)) saturate(140%);
+  overflow:hidden;
+}
+/* Sidebar */
+.sidebar{padding:24px 16px;display:flex;flex-direction:column;gap:24px}
+.logo{display:flex;align-items:center;gap:10px;padding:0 8px}
+.logo-dot{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent-aurora),var(--accent-violet));box-shadow:0 0 24px oklch(0.78 0.18 170 / 0.4)}
+.logo-text{font-weight:700;font-size:16px;letter-spacing:-0.01em}
+.compose{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 16px;border-radius:var(--radius-md);
+  background:linear-gradient(135deg,var(--accent-aurora) 0%,var(--accent-violet) 100%);
+  color:#06120f;font-weight:600;font-size:14px;cursor:pointer;
+  border:none;
+}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--ink-70);font-size:13.5px;cursor:pointer;transition:all .15s}
+.nav-item:hover{background:var(--glass-panel-hi);color:var(--ink-100)}
+.nav-item.active{background:var(--glass-panel-hi);color:var(--ink-100);border:1px solid var(--glass-stroke-hi)}
+.nav-item .count{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--ink-50)}
+.nav-section{font-size:10px;letter-spacing:0.12em;color:var(--ink-50);text-transform:uppercase;padding:0 12px;margin-top:8px;margin-bottom:4px}
+.label-dot{width:8px;height:8px;border-radius:50%}
+/* Thread list */
+.threads{display:flex;flex-direction:column;overflow:hidden}
+.threads-head{padding:20px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--glass-stroke)}
+.threads-title{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.threads-sub{font-family:var(--font-mono);font-size:11px;color:var(--ink-50);margin-top:2px}
+.filter-pill{display:flex;gap:4px;font-family:var(--font-mono);font-size:10px;color:var(--ink-50)}
+.filter-pill span{padding:4px 8px;border-radius:6px;border:1px solid var(--glass-stroke)}
+.filter-pill span.on{color:var(--accent-aurora);border-color:var(--accent-aurora);background:oklch(0.78 0.18 170 / 0.08)}
+.thread-list{flex:1;overflow-y:auto}
+.thread{padding:14px 20px;border-bottom:1px solid var(--glass-stroke);cursor:pointer;display:flex;gap:12px;transition:background .15s}
+.thread:hover{background:var(--glass-panel-hi)}
+.thread.active{background:var(--glass-panel-hi);border-left:2px solid var(--accent-aurora);padding-left:18px}
+.avatar{width:36px;height:36px;border-radius:50%;flex:none;background:var(--glass-panel-hi);border:1px solid var(--glass-stroke);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:var(--ink-70)}
+.thread-body{flex:1;min-width:0}
+.thread-row1{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.thread-from{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thread-time{font-family:var(--font-mono);font-size:10px;color:var(--ink-50);white-space:nowrap}
+.thread-subj{font-size:13px;color:var(--ink-70);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thread-snip{font-size:12px;color:var(--ink-50);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
+.thread-tags{display:flex;gap:6px;margin-top:6px}
+.tag{font-family:var(--font-mono);font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid var(--glass-stroke);color:var(--ink-50)}
+.tag.priority{color:var(--accent-aurora);border-color:oklch(0.78 0.18 170 / 0.4)}
+.tag.ai{color:var(--accent-violet);border-color:oklch(0.68 0.20 300 / 0.4)}
+/* Reader */
+.reader{display:flex;flex-direction:column;overflow:hidden}
+.reader-head{padding:28px 32px 20px;border-bottom:1px solid var(--glass-stroke)}
+.reader-subj{font-size:24px;font-weight:700;letter-spacing:-0.02em;margin-bottom:12px}
+.reader-meta{display:flex;align-items:center;gap:12px}
+.reader-from{display:flex;align-items:center;gap:10px}
+.reader-from .avatar{width:32px;height:32px;font-size:12px}
+.reader-from-name{font-size:13px;font-weight:600}
+.reader-from-email{font-family:var(--font-mono);font-size:11px;color:var(--ink-50)}
+.reader-time{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--ink-50)}
+.reader-actions{display:flex;gap:8px;margin-top:16px}
+.act{padding:6px 12px;border-radius:8px;border:1px solid var(--glass-stroke);background:var(--glass-panel);color:var(--ink-70);font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.act:hover{border-color:var(--glass-stroke-hi);color:var(--ink-100)}
+.reader-body{padding:24px 32px;overflow-y:auto;flex:1;font-size:14px;line-height:1.7;color:var(--ink-70)}
+.reader-body p{margin-bottom:14px}
+.reader-body p strong{color:var(--ink-100)}
+
+/* AI panel */
+.ai-panel{
+  margin:20px 32px;
+  padding:16px;
+  border-radius:var(--radius-md);
+  border:1px solid oklch(0.68 0.20 300 / 0.28);
+  background:linear-gradient(135deg, oklch(0.68 0.20 300 / 0.06), oklch(0.78 0.18 170 / 0.04));
+}
+.ai-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.ai-badge{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--accent-aurora),var(--accent-violet));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#06120f}
+.ai-title{font-size:12px;font-weight:600;letter-spacing:0.02em}
+.ai-label{font-family:var(--font-mono);font-size:10px;color:var(--ink-50);margin-left:auto}
+.ai-summary{font-size:13px;color:var(--ink-100);line-height:1.6;margin-bottom:12px}
+.ai-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ai-chip{padding:6px 10px;border-radius:8px;border:1px solid oklch(0.68 0.20 300 / 0.3);color:var(--ink-100);font-size:11.5px;cursor:pointer;background:var(--glass-panel)}
+.ai-chip:hover{background:var(--glass-panel-hi);border-color:var(--accent-violet)}
+
+/* Reply composer */
+.composer{margin:0 32px 24px;padding:14px 16px;border-radius:var(--radius-md);border:1px solid var(--glass-stroke);background:var(--glass-panel);display:flex;align-items:center;gap:10px}
+.composer input{flex:1;background:none;border:none;color:var(--ink-100);font-family:var(--font-display);font-size:13.5px;outline:none}
+.composer input::placeholder{color:var(--ink-50)}
+.send{padding:8px 14px;border-radius:8px;background:var(--accent-aurora);color:#06120f;border:none;font-weight:600;font-size:12px;cursor:pointer}
+.search{margin:0 16px 12px;padding:10px 14px;border-radius:10px;border:1px solid var(--glass-stroke);background:var(--glass-panel);display:flex;align-items:center;gap:8px}
+.search input{flex:1;background:none;border:none;color:var(--ink-100);font-size:12.5px;outline:none;font-family:var(--font-display)}
+.search input::placeholder{color:var(--ink-50)}
+.search .kbd{font-family:var(--font-mono);font-size:10px;color:var(--ink-50);padding:2px 6px;border:1px solid var(--glass-stroke);border-radius:4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="panel sidebar">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <div class="logo-text">AuroraMail</div>
+    </div>
+    <button class="compose">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+      Compose
+    </button>
+    <div class="nav">
+      <div class="nav-section">Mail</div>
+      <div class="nav-item active"><span>📥</span> Inbox <span class="count">124</span></div>
+      <div class="nav-item"><span>⭐</span> Starred <span class="count">18</span></div>
+      <div class="nav-item"><span>✉️</span> Sent <span class="count">2.1K</span></div>
+      <div class="nav-item"><span>📦</span> Archive <span class="count">—</span></div>
+
+      <div class="nav-section">Smart</div>
+      <div class="nav-item"><span class="label-dot" style="background:var(--accent-aurora)"></span> Priority <span class="count">7</span></div>
+      <div class="nav-item"><span class="label-dot" style="background:var(--accent-violet)"></span> AI Drafts <span class="count">3</span></div>
+      <div class="nav-item"><span class="label-dot" style="background:oklch(0.72 0.15 60)"></span> Follow-ups <span class="count">12</span></div>
+
+      <div class="nav-section">Labels</div>
+      <div class="nav-item"><span class="label-dot" style="background:#d86c4f"></span> Customers</div>
+      <div class="nav-item"><span class="label-dot" style="background:#5ec2b1"></span> Engineering</div>
+      <div class="nav-item"><span class="label-dot" style="background:#b87cc9"></span> Design</div>
+    </div>
+  </aside>
+
+  <!-- Thread list -->
+  <section class="panel threads">
+    <div class="threads-head">
+      <div>
+        <div class="threads-title">Inbox</div>
+        <div class="threads-sub">124 unread · sorted by AI priority</div>
+      </div>
+      <div class="filter-pill"><span class="on">ALL</span><span>UNREAD</span></div>
+    </div>
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input placeholder="Search mail…"/>
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="thread-list">
+      <div class="thread active">
+        <div class="avatar">SC</div>
+        <div class="thread-body">
+          <div class="thread-row1"><div class="thread-from">Sarah Chen · Anthropic</div><div class="thread-time">09:42</div></div>
+          <div class="thread-subj">Re: Opus 4.7 hackathon submission</div>
+          <div class="thread-snip">Love what you've built with Handoff-CDN. Couple of questions on the visual regression pipeline — how deterministic are the ASCII heatmaps across runs?</div>
+          <div class="thread-tags"><span class="tag priority">PRIORITY</span><span class="tag ai">AI-DRAFT READY</span></div>
+        </div>
+      </div>
+      <div class="thread">
+        <div class="avatar">JR</div>
+        <div class="thread-body">
+          <div class="thread-row1"><div class="thread-from">Jordan Reese</div><div class="thread-time">08:17</div></div>
+          <div class="thread-subj">Design review: SpectraChat v2 tokens</div>
+          <div class="thread-snip">Pushed the updated oklch palette to the Figma file. Can you grade it before end-of-day?</div>
+          <div class="thread-tags"><span class="tag">DESIGN</span></div>
+        </div>
+      </div>
+      <div class="thread">
+        <div class="avatar">MK</div>
+        <div class="thread-body">
+          <div class="thread-row1"><div class="thread-from">Maya Kowalski</div><div class="thread-time">Yesterday</div></div>
+          <div class="thread-subj">Contributor PR — vaultforge bundle</div>
+          <div class="thread-snip">Opened a PR to add a new Liquid Glass wallet bundle. Ran handoff-cdn push and all guardrails passed. Mind taking a look?</div>
+          <div class="thread-tags"><span class="tag">CONTRIBUTORS</span><span class="tag ai">SUMMARY</span></div>
+        </div>
+      </div>
+      <div class="thread">
+        <div class="avatar">DL</div>
+        <div class="thread-body">
+          <div class="thread-row1"><div class="thread-from">Devin Liu · GitHub</div><div class="thread-time">Yesterday</div></div>
+          <div class="thread-subj">Your package handoff-cdn@0.5.0 is trending</div>
+          <div class="thread-snip">handoff-cdn ranked #3 in "dev tools" this week with 2,147 downloads. Congrats — want to schedule a maintainer chat?</div>
+          <div class="thread-tags"><span class="tag">UPDATES</span></div>
+        </div>
+      </div>
+      <div class="thread">
+        <div class="avatar">AT</div>
+        <div class="thread-body">
+          <div class="thread-row1"><div class="thread-from">Amira Tessouat</div><div class="thread-time">Mon</div></div>
+          <div class="thread-subj">Invoice #2026-041 — consulting Q2</div>
+          <div class="thread-snip">Attached the Q2 invoice as discussed. Let me know if the scope needs adjustment before I send it to finance.</div>
+          <div class="thread-tags"><span class="tag">FINANCE</span></div>
+        </div>
+      </div>
+      <div class="thread">
+        <div class="avatar">RW</div>
+        <div class="thread-body">
+          <div class="thread-row1"><div class="thread-from">Reed Walker</div><div class="thread-time">Sun</div></div>
+          <div class="thread-subj">Meeting notes: Cerebral Valley prep</div>
+          <div class="thread-snip">Rundown of the judging panel + what to emphasize in your 3-minute demo. TL;DR: lead with quantified fidelity, not feature list.</div>
+          <div class="thread-tags"><span class="tag">NOTES</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reader -->
+  <main class="panel reader">
+    <div class="reader-head">
+      <div class="reader-subj">Re: Opus 4.7 hackathon submission</div>
+      <div class="reader-meta">
+        <div class="reader-from">
+          <div class="avatar">SC</div>
+          <div>
+            <div class="reader-from-name">Sarah Chen</div>
+            <div class="reader-from-email">sarah.chen@anthropic.com</div>
+          </div>
+        </div>
+        <div class="reader-time">Today · 09:42 · 3 min read</div>
+      </div>
+      <div class="reader-actions">
+        <div class="act">↩ Reply</div>
+        <div class="act">↪ Forward</div>
+        <div class="act">⭐ Star</div>
+        <div class="act">📦 Archive</div>
+      </div>
+    </div>
+
+    <div class="ai-panel">
+      <div class="ai-head">
+        <div class="ai-badge">A</div>
+        <div class="ai-title">Atlas — AI Summary</div>
+        <div class="ai-label">OPUS 4.7 · 0.9s</div>
+      </div>
+      <div class="ai-summary">Sarah is reviewing your hackathon entry and has <strong>two technical questions</strong>: (1) determinism of the ASCII heatmap output across runs, and (2) whether the visual regression pass supports custom viewport sizes beyond 1920×1080. She mentions the submission deadline is <strong>Friday</strong> — a direct response today keeps you on her radar.</div>
+      <div class="ai-actions">
+        <div class="ai-chip">✨ Draft confident reply</div>
+        <div class="ai-chip">📅 Propose 30-min call</div>
+        <div class="ai-chip">📎 Attach grade output</div>
+        <div class="ai-chip">🎯 Summarize as bullets</div>
+      </div>
+    </div>
+
+    <div class="reader-body">
+      <p>Hey —</p>
+      <p>Finally got around to pulling <strong>handoff-cdn@0.5.0</strong> and running it against a few internal Figma exports. Honestly impressive. The ASCII heatmap is a genuinely clever way to make visual regression legible in a terminal — I haven't seen that pattern before.</p>
+      <p>Two questions before we talk about how this fits into the judging rubric:</p>
+      <p><strong>1.</strong> How deterministic is the heatmap across runs? We tested it on the same bundle twice and saw slightly different severity classifications in row 4–5 (sidebar region). Is that sampling noise from the vision pass, or are the regions genuinely non-deterministic?</p>
+      <p><strong>2.</strong> Does <code>grade --visual</code> support custom viewport sizes? Our mobile team would love to run it at 390×844 but I didn't see a flag.</p>
+      <p>If you can get me answers by end-of-week, I'll have time to write up a proper recommendation for the panel. The submission deadline is Friday.</p>
+      <p>— Sarah</p>
+    </div>
+
+    <div class="composer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--ink-50)"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      <input placeholder="Reply to Sarah — or press ⌘⇧A to insert Atlas draft"/>
+      <button class="send">Send ↗</button>
+    </div>
+  </main>
+</div>
+</body>
+</html>

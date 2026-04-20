@@ -152,6 +152,32 @@
       "comparison": "previews/comparisons/tradepulse.png"
     },
     {
+      "slug": "auroramail",
+      "title": "AuroraMail — AI-Native Email Client",
+      "description": "Three-pane AI-native email client with Liquid Glass aesthetic. Atlas AI summary panel sits inline above the email body, rendering a plain-English TL;DR plus 4 one-click action chips (draft reply, propose call, attach output, summarize). Priority-sorted inbox with PRIORITY and AI-DRAFT tags, color-coded labels sidebar, aurora-to-violet gradient compose button, ⌘K search, reply composer with Atlas draft shortcut.",
+      "family": "Liquid Glass",
+      "fidelity": 96,
+      "tags": ["email", "ai", "desktop", "liquid-glass", "three-pane", "atlas"],
+      "dir": "bundles/auroramail",
+      "primary": "project/AuroraMail.html",
+      "chat": "chats/chat1.md",
+      "preview": "previews/auroramail.png",
+      "comparison": "previews/comparisons/auroramail.png"
+    },
+    {
+      "slug": "sentrygrid",
+      "title": "SentryGrid — Security Operations Console",
+      "description": "Security operations center (SOC) console. Strict Monochrome with a single #00b872 accent reserved for live state only. 5-tile KPI ribbon (14,283 threats blocked / 3 open incidents / MTTD 847ms), live threat feed with CRIT/HIGH/MED/LOW severity pills, 24-bar SVG blocked-traffic chart, 4-tile defense agent grid, country-ranked attack origin bars, and incident timeline with MTTR 3m 42s. Chakra Petch + JetBrains Mono.",
+      "family": "Monochrome",
+      "fidelity": 96,
+      "tags": ["security", "soc", "dashboard", "desktop", "monochrome", "incident-response"],
+      "dir": "bundles/sentrygrid",
+      "primary": "project/SentryGrid.html",
+      "chat": "chats/chat1.md",
+      "preview": "previews/sentrygrid.png",
+      "comparison": "previews/comparisons/sentrygrid.png"
+    },
+    {
       "slug": "shiptrack",
       "title": "ShipTrack — Logistics Operations Center",
       "description": "Shipment tracking operations dashboard. Monochrome: header with 247 active routes live indicator, sidebar with nav and key metrics (94.2% on-time), 4 stat cards, 8-row shipments table with tracking IDs/routes/carriers/status badges, CSS bar chart for carrier performance, and route exceptions list. One green accent for live status only.",
