@@ -229,6 +229,26 @@ function mockResponse({ system = '', user = '', images = [] }) {
     });
   }
 
+  // ── Remix (hybrid bundle) ──────────────────────────────────────────────
+  if (s.includes('handoff-cdn bundle remixer')) {
+    // Target family comes from the "target_family" hint in user prompt
+    const targetFamily = user.match(/target_family:\s*(Liquid Glass|Monochrome)/i)?.[1] || 'Liquid Glass';
+    const slugA = user.match(/layout_from:\s*([a-z0-9-]+)/i)?.[1] || 'a';
+    const slugB = user.match(/tokens_from:\s*([a-z0-9-]+)/i)?.[1] || 'b';
+    return JSON.stringify({
+      slug: `remix-${slugA}-${slugB}`,
+      title: `Remix · ${slugA} × ${slugB}`,
+      description: `Hybrid bundle: layout skeleton from ${slugA}, ${targetFamily} token palette from ${slugB}.`,
+      family: targetFamily,
+      tags: ['remix', 'hybrid', targetFamily.toLowerCase().replace(' ', '-')],
+      html: targetFamily === 'Monochrome' ? mockMonoHtml(`Remix ${slugA}×${slugB}`) : mockGlassHtml(`Remix ${slugA}×${slugB}`),
+      tokens_css: targetFamily === 'Monochrome'
+        ? ':root { --bg:#0a0b0c; --panel:#111315; --line:#23282d; --ink-0:#e9ecee; --live:#00b872; --s-1:4px; --s-2:8px; --s-4:16px; }'
+        : ':root { --glass-bg-0:oklch(0.09 0.04 260); --glass-panel:oklch(1 0 0/0.04); --glass-stroke:oklch(1 0 0/0.10); --ink-100:oklch(0.97 0.005 80); --blur-md:16px; }',
+      intent_transcript: `# Remix Intent\n\nTaking the structural layout of ${slugA} and re-skinning it with the ${targetFamily} tokens that made ${slugB} sing. Keep the grid, swap the palette, respect the baseline.`,
+    });
+  }
+
   // ── Fallback — just echo a generic JSON ────────────────────────────────
   return JSON.stringify({ note: 'mock response', system_preview: system.slice(0, 80) });
 }
@@ -520,11 +540,19 @@ Handoff-CDN — The Design-to-Code Protocol  v${VERSION}
 Powered by Opus 4.7 (requires ANTHROPIC_API_KEY — or add --mock for offline demo):
   npx handoff-cdn grade <file> --against <slug> [--visual]   Code + visual regression
   npx handoff-cdn forge "<prompt>"                 Generate a new bundle from a prompt
+  npx handoff-cdn forge --from-image <path.png>    Screenshot → Handoff-CDN bundle (vision)
+  npx handoff-cdn remix <slug-a> <slug-b>          Layout from A × tokens from B
   npx handoff-cdn arena                            Live split-screen demo: 4.7 vs 4.7+Handoff
+
+Local tools — zero API calls:
+  npx handoff-cdn diff <file> <slug>               Side-by-side wipe viewer in browser
+  npx handoff-cdn lint <file> [--family <name>]    Token rule linter (CI-ready, exits 1 on errors)
 
 Offline demo mode — canned responses, no API key needed:
   npx handoff-cdn grade <file> --against <slug> --mock
   npx handoff-cdn arena --mock
+  npx handoff-cdn forge --from-image shot.png --mock
+  npx handoff-cdn remix aerodrop agentic-ops --mock
 
 Examples:
   npx handoff-cdn use aerodrop | claude
@@ -1445,13 +1473,32 @@ if (cmd === 'push') {
 
 // ── forge ─────────────────────────────────────────────────────────────────────
 if (cmd === 'forge') {
-  const prompt = args.join(' ').trim();
-  if (!prompt) {
+  // Parse --from-image flag (+ path) out of args so the remaining text is the prompt.
+  let imagePath = null;
+  const forgeArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--from-image') { imagePath = args[++i]; continue; }
+    forgeArgs.push(args[i]);
+  }
+  const prompt = forgeArgs.join(' ').trim() || (imagePath ? 'Implement the UI shown in the image.' : '');
+  if (!prompt && !imagePath) {
     stderr.write('Usage: handoff-cdn forge "<description of UI>"\n');
+    stderr.write('       handoff-cdn forge --from-image <path.png> ["optional hints"]\n');
     stderr.write('Example: handoff-cdn forge "neobrutalist notes app, orange accents"\n');
     exit(1);
   }
-  stderr.write(`\n🔨 Forging bundle from: "${prompt}"\n`);
+  let forgeImages = [];
+  if (imagePath) {
+    try {
+      const buf = await fs.readFile(path.resolve(cwd(), imagePath));
+      const ext = path.extname(imagePath).slice(1).toLowerCase();
+      const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+      forgeImages = [{ data: buf.toString('base64'), media_type: mime }];
+      stderr.write(`\n🖼️  Forging from image: ${imagePath} (${(buf.length/1024).toFixed(1)}KB)\n`);
+    } catch (e) { stderr.write(`Could not read image: ${e.message}\n`); exit(1); }
+  } else {
+    stderr.write(`\n🔨 Forging bundle from: "${prompt}"\n`);
+  }
   stderr.write(`   Model: Opus 4.7  ·  This takes ~30-60s...\n\n`);
 
   const system = `You are a Handoff-CDN bundle generator. Given a UI description, produce a complete bundle.
@@ -1481,7 +1528,7 @@ Output ONLY the JSON. Nothing else.`;
   const user = `Generate a Handoff-CDN bundle for: ${prompt}`;
 
   let result;
-  try { result = await callAnthropic({ system, user, maxTokens: 16000 }); }
+  try { result = await callAnthropic({ system, user, maxTokens: 16000, images: forgeImages }); }
   catch (e) { stderr.write(`Forge failed: ${e.message}\n`); exit(1); }
 
   let bundle;
@@ -1655,6 +1702,258 @@ if (cmd === 'arena') {
     } catch {}
   });
   await new Promise(() => {});
+}
+
+// ── diff ──────────────────────────────────────────────────────────────────────
+// Side-by-side wipe viewer: user's HTML vs the reference bundle.
+// Opens a local server on an ephemeral port with a draggable divider.
+if (cmd === 'diff') {
+  const [userFile, slug] = args;
+  if (!userFile || !slug) {
+    stderr.write('Usage: handoff-cdn diff <your-file.html> <slug>\n');
+    stderr.write('Example: handoff-cdn diff ./dist/index.html aerodrop\n');
+    exit(1);
+  }
+  const b = bySlug[slug];
+  if (!b) { stderr.write(`Unknown slug: ${slug}\nKnown: ${slugList}\n`); exit(1); }
+  let userHtml;
+  try { userHtml = await fs.readFile(path.resolve(cwd(), userFile), 'utf8'); }
+  catch (e) { stderr.write(`Could not read ${userFile}: ${e.message}\n`); exit(1); }
+  const refHtml = await get(`${manifest.cdn}/${b.dir}/${b.primary}`).catch(() => '<html><body>ref unavailable</body></html>');
+  const viewer = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Diff · ${slug}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0b0c;color:#e9ecee;font-family:"JetBrains Mono",monospace;overflow:hidden;height:100vh}
+.bar{height:44px;background:#111315;border-bottom:1px solid #23282d;display:flex;align-items:center;padding:0 16px;gap:16px;font-size:12px}
+.bar .brand{font-weight:700;letter-spacing:.05em}
+.bar .chip{padding:3px 8px;border:1px solid #2e343a;border-radius:4px;font-size:10px;color:#9aa1a8}
+.stage{position:relative;height:calc(100vh - 44px);overflow:hidden}
+.pane{position:absolute;inset:0;width:100%;height:100%}
+.pane iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+.pane.ref{clip-path:inset(0 0 0 50%)}
+.handle{position:absolute;top:0;bottom:0;left:50%;width:2px;background:#00b872;z-index:10;cursor:ew-resize;box-shadow:0 0 16px rgba(0,184,114,.5)}
+.handle::before{content:"↔";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#00b872;color:#0a0b0c;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;font-family:system-ui}
+.lbl{position:absolute;top:12px;padding:4px 10px;background:rgba(10,11,12,.9);border:1px solid #2e343a;border-radius:4px;font-size:11px;color:#e9ecee;letter-spacing:.08em;z-index:5}
+.lbl.a{left:12px}.lbl.b{right:12px;color:#00b872;border-color:rgba(0,184,114,.5)}
+</style></head><body>
+<div class="bar">
+  <span class="brand">Handoff-CDN · DIFF</span>
+  <span class="chip">your file: ${userFile.replace(/</g,'&lt;')}</span>
+  <span class="chip">reference: ${slug}</span>
+  <span class="chip">family: ${b.family}</span>
+</div>
+<div class="stage">
+  <div class="pane user"><iframe sandbox="allow-scripts" srcdoc="${userHtml.replace(/"/g,'&quot;')}"></iframe></div>
+  <div class="pane ref" id="ref"><iframe sandbox="allow-scripts" srcdoc="${refHtml.replace(/"/g,'&quot;')}"></iframe></div>
+  <div class="handle" id="h"></div>
+  <div class="lbl a">YOUR FILE</div>
+  <div class="lbl b">${slug.toUpperCase()} REF</div>
+</div>
+<script>
+const stage=document.querySelector('.stage'),ref=document.getElementById('ref'),h=document.getElementById('h');
+let drag=false;
+function set(p){p=Math.max(5,Math.min(95,p));h.style.left=p+'%';ref.style.clipPath='inset(0 0 0 '+p+'%)';}
+h.addEventListener('mousedown',()=>drag=true);
+window.addEventListener('mouseup',()=>drag=false);
+window.addEventListener('mousemove',e=>{if(!drag)return;const r=stage.getBoundingClientRect();set((e.clientX-r.left)/r.width*100);});
+</script></body></html>`;
+  const { url } = await serveHtmlOnce(viewer);
+  stderr.write(`\n🔍 Diff viewer ready: ${url}\n`);
+  stderr.write(`   Drag the green handle to wipe between your file and the ${slug} reference.\n`);
+  stderr.write(`   Ctrl-C to stop.\n\n`);
+  try {
+    const opener = process.platform === 'win32' ? `start "" "${url}"`
+                 : process.platform === 'darwin' ? `open "${url}"`
+                 : `xdg-open "${url}"`;
+    execSync(opener, { stdio: 'ignore' });
+  } catch {}
+  await new Promise(() => {});
+}
+
+// ── lint ──────────────────────────────────────────────────────────────────────
+// Regex-based token linter. Deterministic, no API call. Exit code 1 on errors.
+if (cmd === 'lint') {
+  const familyIdx = args.indexOf('--family');
+  const familyFlag = familyIdx >= 0 ? args[familyIdx + 1] : null;
+  const jsonIdx = args.indexOf('--json');
+  const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--family');
+  const userFile = positional[0];
+  if (!userFile) {
+    stderr.write('Usage: handoff-cdn lint <file.html> [--family "Liquid Glass"|Monochrome] [--json]\n');
+    exit(1);
+  }
+  let src;
+  try { src = await fs.readFile(path.resolve(cwd(), userFile), 'utf8'); }
+  catch (e) { stderr.write(`Could not read ${userFile}: ${e.message}\n`); exit(1); }
+  // Infer family if not explicit
+  const usesOklch = /oklch\s*\(/i.test(src);
+  const usesBlur = /backdrop-filter\s*:/i.test(src);
+  const family = familyFlag || (usesOklch || usesBlur ? 'Liquid Glass' : 'Monochrome');
+  const issues = [];
+  const lines = src.split('\n');
+  function add(severity, rule, found, expected, lineNum) {
+    issues.push({ severity, rule, found, expected, line: lineNum });
+  }
+  // Find line numbers for regex matches
+  function linesFor(re) {
+    const out = [];
+    lines.forEach((l, i) => { if (re.test(l)) out.push({ ln: i + 1, line: l.trim() }); });
+    return out;
+  }
+  if (family === 'Liquid Glass') {
+    // Rule: no hex colors (except #000, #fff, #ffffff for utility)
+    const hexes = linesFor(/#[0-9a-fA-F]{3,8}\b/);
+    for (const h of hexes) {
+      const m = h.line.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
+      for (const hex of m) {
+        if (/^#(000|fff|000000|ffffff)$/i.test(hex)) continue;
+        add('error', 'oklch→hex conversion', hex, 'oklch(...)', h.ln);
+      }
+    }
+    // Rule: panels need backdrop-filter
+    if (!usesBlur) add('error', 'missing backdrop-filter', 'none', 'blur(16px) saturate(140%)', 0);
+    // Rule: radius must be 10-32
+    const radii = linesFor(/border-radius\s*:\s*[0-9]+px/);
+    for (const r of radii) {
+      const m = r.line.match(/border-radius\s*:\s*([0-9]+)px/);
+      if (!m) continue;
+      const v = +m[1];
+      if (v < 10) add('error', 'radius below Liquid Glass floor', v + 'px', '10px minimum', r.ln);
+      if (v > 32) add('warn',  'radius above Liquid Glass ceiling', v + 'px', '32px maximum', r.ln);
+    }
+    // Rule: no heavy drop shadows
+    const shadows = linesFor(/box-shadow\s*:[^;]*rgba?\([^)]*0?\.[3-9]/);
+    for (const s of shadows) add('warn', 'heavy drop shadow', s.line.slice(0, 60), 'hairline stroke preferred', s.ln);
+  } else {
+    // Monochrome rules
+    // Rule: 4px baseline — padding/margin with non-multiples-of-4 numeric px
+    const spacings = linesFor(/(padding|margin|gap|height|width)\s*:\s*[0-9]+px/);
+    for (const sp of spacings) {
+      const m = sp.line.match(/(padding|margin|gap|height|width)\s*:\s*([0-9]+)px/);
+      if (!m) continue;
+      const v = +m[2];
+      if (v % 4 !== 0 && v > 4) add('error', '4px baseline violation', v + 'px', `${Math.round(v / 4) * 4}px (multiple of 4)`, sp.ln);
+    }
+    // Rule: radius ≤ 6
+    const radii = linesFor(/border-radius\s*:\s*[0-9]+px/);
+    for (const r of radii) {
+      const m = r.line.match(/border-radius\s*:\s*([0-9]+)px/);
+      if (!m) continue;
+      const v = +m[1];
+      if (v > 6) add('error', 'radius exceeds Monochrome cap', v + 'px', '≤ 6px', r.ln);
+    }
+    // Rule: no gradients (except hairline)
+    const grads = linesFor(/linear-gradient\(|radial-gradient\(/);
+    for (const g of grads) add('warn', 'gradient used', 'linear/radial-gradient', 'flat fills only', g.ln);
+    // Rule: multiple bright accents — crude heuristic: count distinct hex values not in grayscale
+    const uniqueAccents = new Set();
+    const allHex = [...src.matchAll(/#([0-9a-fA-F]{6})\b/g)].map(m => m[1].toLowerCase());
+    for (const hex of allHex) {
+      const r = parseInt(hex.slice(0, 2), 16), gg = parseInt(hex.slice(2, 4), 16), bl = parseInt(hex.slice(4, 6), 16);
+      const max = Math.max(r, gg, bl), min = Math.min(r, gg, bl);
+      if (max - min > 60 && max > 120) uniqueAccents.add(hex);
+    }
+    if (uniqueAccents.size > 1) {
+      add('error', 'multiple accents', [...uniqueAccents].slice(0, 3).map(h => '#' + h).join(', '), 'single accent only (#00b872 recommended)', 0);
+    }
+  }
+  const errors = issues.filter(i => i.severity === 'error').length;
+  const warns = issues.filter(i => i.severity === 'warn').length;
+  if (args.includes('--json')) {
+    stdout.write(JSON.stringify({ file: userFile, family, errors, warns, issues }, null, 2) + '\n');
+    exit(errors ? 1 : 0);
+  }
+  stdout.write(`\nHandoff-CDN Lint · ${userFile}\n`);
+  stdout.write(`Family: ${family}  ·  Errors: ${errors}  ·  Warnings: ${warns}\n`);
+  stdout.write('─'.repeat(72) + '\n');
+  if (!issues.length) {
+    stdout.write(`✔  No violations detected. Clean ${family} implementation.\n\n`);
+    exit(0);
+  }
+  for (const i of issues) {
+    const tag = i.severity === 'error' ? '✗ ERROR' : '⚠ WARN ';
+    stdout.write(`${tag}  ${i.line ? 'L' + i.line : '    '}  ${i.rule}\n`);
+    stdout.write(`          found:    ${i.found}\n`);
+    stdout.write(`          expected: ${i.expected}\n\n`);
+  }
+  stdout.write(errors ? `✗  ${errors} error(s). Fix before shipping.\n\n` : `⚠  ${warns} warning(s). Ship but review.\n\n`);
+  exit(errors ? 1 : 0);
+}
+
+// ── remix ─────────────────────────────────────────────────────────────────────
+// Take layout from A, token palette from B → emit a new hybrid bundle.
+if (cmd === 'remix') {
+  const [slugA, slugB] = args;
+  if (!slugA || !slugB) {
+    stderr.write('Usage: handoff-cdn remix <layout-slug> <tokens-slug>\n');
+    stderr.write('Example: handoff-cdn remix aerodrop agentic-ops\n');
+    exit(1);
+  }
+  const bA = bySlug[slugA], bB = bySlug[slugB];
+  if (!bA) { stderr.write(`Unknown slug: ${slugA}\n`); exit(1); }
+  if (!bB) { stderr.write(`Unknown slug: ${slugB}\n`); exit(1); }
+  if (!process.env.ANTHROPIC_API_KEY && process.env.HANDOFF_MOCK !== '1') {
+    stderr.write('ANTHROPIC_API_KEY required. Or use --mock for offline demo.\n'); exit(1);
+  }
+  stderr.write(`\n🎛️  Remixing: layout from ${slugA} × tokens from ${slugB} → ${bB.family}\n`);
+  stderr.write(`   Model: Opus 4.7  ·  This takes ~30-60s...\n\n`);
+  const htmlA = await get(`${manifest.cdn}/${bA.dir}/${bA.primary}`).catch(() => '');
+  const htmlB = await get(`${manifest.cdn}/${bB.dir}/${bB.primary}`).catch(() => '');
+  const system = `You are a Handoff-CDN bundle remixer. Take the structural LAYOUT (component tree, grid, spacing rhythm, information hierarchy) from bundle A and re-skin it with the TOKEN PALETTE + family rules of bundle B.
+
+Output STRICTLY VALID JSON — no preamble, no code fences:
+{
+  "slug": "remix-<slugA>-<slugB>",
+  "title": "Remix · <slugA> × <slugB>",
+  "description": "1-2 sentences",
+  "family": "${bB.family}",
+  "tags": ["remix","hybrid","..."],
+  "html": "<!DOCTYPE html>...complete self-contained HTML...",
+  "tokens_css": ":root { /* from bundle B */ }",
+  "intent_transcript": "30 lines explaining the remix decisions"
+}
+
+HARD RULES:
+- Keep A's layout skeleton (grid, columns, component placement, information density)
+- Apply B's token family strictly: ${bB.family === 'Liquid Glass' ? 'oklch() only, backdrop-filter blur required, radius 10-32' : 'hex only, 4px baseline, radius ≤6, #00b872 sole accent'}
+- Never mix families within the output
+- Real content, no Lorem ipsum
+
+Output ONLY the JSON.`;
+  const user = `target_family: ${bB.family}
+layout_from: ${slugA}
+tokens_from: ${slugB}
+
+## Bundle A layout (extract the grid + component tree):
+\`\`\`
+${htmlA.slice(0, 9000)}
+\`\`\`
+
+## Bundle B tokens (extract the palette + family rules):
+\`\`\`
+${htmlB.slice(0, 9000)}
+\`\`\`
+
+Produce the remix bundle JSON now.`;
+  let result;
+  try { result = await callAnthropic({ system, user, maxTokens: 16000 }); }
+  catch (e) { stderr.write(`Remix failed: ${e.message}\n`); exit(1); }
+  let bundle;
+  try { bundle = JSON.parse(stripFences(result)); }
+  catch { stderr.write('Remix returned non-JSON:\n' + result.slice(0, 600) + '\n'); exit(1); }
+  const dir = path.resolve(cwd(), 'bundles', bundle.slug);
+  await fs.mkdir(path.join(dir, 'project'), { recursive: true });
+  await fs.mkdir(path.join(dir, 'chats'), { recursive: true });
+  const primaryName = (bundle.title.split('—')[0].split('·')[0].trim().replace(/\s+/g, '') || bundle.slug) + '.html';
+  await fs.writeFile(path.join(dir, 'project', primaryName), bundle.html, 'utf8');
+  await fs.writeFile(path.join(dir, 'project', 'tokens.css'), bundle.tokens_css, 'utf8');
+  await fs.writeFile(path.join(dir, 'chats', 'chat1.md'), bundle.intent_transcript, 'utf8');
+  await fs.writeFile(path.join(dir, 'README.md'),
+    `# ${bundle.title}\n\n${bundle.description}\n\n**Family:** ${bundle.family}\n**Layout source:** ${slugA}\n**Token source:** ${slugB}\n\nRemixed by Opus 4.7 via \`npx handoff-cdn remix ${slugA} ${slugB}\`.\n`);
+  stdout.write(`\n✔ Remix bundle created: bundles/${bundle.slug}/\n`);
+  stdout.write(`   Preview:  npx handoff-cdn preview ${bundle.slug}  (requires manifest entry)\n`);
+  stdout.write(`   Primary:  bundles/${bundle.slug}/project/${primaryName}\n\n`);
+  exit(0);
 }
 
 // ── use ───────────────────────────────────────────────────────────────────────

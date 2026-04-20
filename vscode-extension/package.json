@@ -1,0 +1,49 @@
+{
+  "name": "handoff-cdn-vscode",
+  "displayName": "Handoff-CDN",
+  "description": "Browse 14 pixel-perfect design bundles and pipe them into Copilot/Cline/Continue chat. Design-to-code protocol for Claude.",
+  "version": "0.1.0",
+  "publisher": "miikeey1100",
+  "repository": { "type": "git", "url": "https://github.com/miikeey1100/handoff-cdn" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "AI"],
+  "keywords": ["design", "handoff", "claude", "copilot", "cline", "ui"],
+  "activationEvents": ["onView:handoffCdnBundles", "onCommand:handoffCdn.browse"],
+  "main": "./extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "handoffCdn",
+          "title": "Handoff-CDN",
+          "icon": "$(symbol-color)"
+        }
+      ]
+    },
+    "views": {
+      "handoffCdn": [
+        { "id": "handoffCdnBundles", "name": "Bundles" }
+      ]
+    },
+    "commands": [
+      { "command": "handoffCdn.browse",         "title": "Handoff-CDN: Browse Bundles" },
+      { "command": "handoffCdn.preview",        "title": "Handoff-CDN: Preview Bundle" },
+      { "command": "handoffCdn.insertIntoChat", "title": "Handoff-CDN: Insert Bundle into Chat" },
+      { "command": "handoffCdn.copyPrompt",     "title": "Handoff-CDN: Copy Bundle Prompt" },
+      { "command": "handoffCdn.refresh",        "title": "Refresh", "icon": "$(refresh)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "handoffCdn.refresh", "when": "view == handoffCdnBundles", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "handoffCdn.preview",        "when": "view == handoffCdnBundles && viewItem == bundle", "group": "inline" },
+        { "command": "handoffCdn.insertIntoChat", "when": "view == handoffCdnBundles && viewItem == bundle" },
+        { "command": "handoffCdn.copyPrompt",     "when": "view == handoffCdnBundles && viewItem == bundle" }
+      ]
+    }
+  },
+  "scripts": {
+    "package": "vsce package"
+  }
+}

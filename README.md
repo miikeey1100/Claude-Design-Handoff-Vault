@@ -131,6 +131,22 @@ Works with **Claude Code, Cursor, ChatGPT, Gemini, Copilot** — any tool that a
 
 ---
 
+## New in v0.6.0 — The Full Toolkit
+
+| Command | What it does |
+|---|---|
+| `handoff-cdn diff <your-file> <slug>` | Side-by-side wipe viewer in your browser. Drag a handle to compare your implementation against the reference bundle. Zero API calls. |
+| `handoff-cdn lint <file> [--family ...]` | Deterministic token-rule linter. Catches `oklch→hex` conversions, off-baseline spacing, over-cap radii, extra accents. CI-ready — exits 1 on errors. `--json` for machine output. |
+| `handoff-cdn remix <slug-a> <slug-b>` | Take layout skeleton from A, re-skin with B's token family. 14 × 14 = 196 possible hybrids. Powered by Opus 4.7. |
+| `handoff-cdn forge --from-image <path>` | Screenshot → Handoff-CDN bundle. Vision-in, compliant bundle out (HTML + tokens.css + chat.md). |
+| `handoff-cdn arena [--mock]` | Live split-screen race: Opus 4.7 alone vs Opus 4.7 + Handoff-CDN. Opus grades both. Typical delta: +32 points. |
+| **VS Code extension** (`vscode-extension/`) | Activity-bar sidebar with all 14 bundles. One click inserts a full design contract into your active editor — works with Copilot Chat, Cline, Continue. |
+| **Hosted arena** (Vercel) | `vercel.json` + `api/*.js` — deploy your own instance in one command. No install, judges click a link. |
+
+All commands support `--mock` for offline demos — canned responses, no API key needed.
+
+---
+
 ## Example output
 
 Running `npx handoff-cdn use aerodrop` streams:
